@@ -108,112 +108,113 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        const telegramUser = tg.initDataUnsafe?.user;
+        // Damos un pequeño respiro para que el SDK de Telegram cargue sus datos si se abrió desde el bot
+        setTimeout(() => {
+            const telegramUser = tg.initDataUnsafe?.user;
 
-        if (!telegramUser || !telegramUser.id) {
-            // Si el usuario entra por navegador web externo, mostramos el aviso explicativo
-            document.getElementById('status').innerText = '🔒 Acceso restringido';
-            document.getElementById('imagen').style.display = 'none';
-            document.getElementById('btn_a').style.display = 'none';
-            document.getElementById('btn_b').style.display = 'none';
-            
-            document.getElementById('pregunta').innerHTML = `
-                <div class="blocked-card">
-                    <h3>⚠️ ¡Atención!</h3>
-                    <p>Esta aventura interactiva está diseñada para jugarse exclusivamente desde nuestra <strong>Mini App oficial en Telegram</strong>.</p>
-                    <p>Por favor, abre nuestro bot en Telegram para votar y participar con tu comunidad.</p>
-                </div>
-            `;
-        } else {
-            // Si entra desde Telegram, la app funciona normalmente
-            const userId = telegramUser.id.toString();
+            if (!telegramUser || !telegramUser.id) {
+                // Si no hay usuario de Telegram, mostramos el aviso bloqueado inmediatamente
+                document.getElementById('status').innerText = '🔒 Acceso restringido';
+                document.getElementById('imagen').style.display = 'none';
+                document.getElementById('btn_a').style.display = 'none';
+                document.getElementById('btn_b').style.display = 'none';
+                
+                document.getElementById('pregunta').innerHTML = `
+                    <div class="blocked-card">
+                        <h3>⚠️ ¡Atención!</h3>
+                        <p>Esta aventura interactiva está diseñada para jugarse exclusivamente desde nuestra <strong>Mini App oficial en Telegram</strong>.</p>
+                        <p>Por favor, abre nuestro bot en Telegram para votar y participar con tu comunidad.</p>
+                    </div>
+                `;
+            } else {
+                // Si es un usuario válido de Telegram, cargamos el juego con normalidad
+                iniciarJuego(telegramUser.id.toString());
+            }
+        }, 500);
+
+        async function iniciarJuego(userId) {
             let capituloActualId = '';
 
-            async function cargarCapitulo() {
-                try {
-                    const { data, error } = await supabaseClient
-                        .from('capitulo_activo')
-                        .select('*')
-                        .limit(1)
-                        .maybeSingle();
-
-                    if (error) throw error;
-
-                    if (data) {
-                        capituloActualId = data.capitulo_id;
-                        document.getElementById('status').innerText = data.estado_personaje || 'Estado activo';
-                        document.getElementById('imagen').src = data.imagen_url || 'https://picsum.photos/400/200';
-                        document.getElementById('pregunta').innerText = data.pregunta || 'Sin pregunta definida';
-                        document.getElementById('btn_a').innerText = data.opcion_a || 'Opción A';
-                        document.getElementById('btn_b').innerText = data.opcion_b || 'Opción B';
-                        
-                        document.getElementById('btn_a').disabled = false;
-                        document.getElementById('btn_b').disabled = false;
-                        
-                        document.getElementById('btn_a').onclick = () => votar('A');
-                        document.getElementById('btn_b').onclick = () => votar('B');
-
-                        verificarVotoPrevio();
-                    } else {
-                        document.getElementById('pregunta').innerText = 'No hay capítulos activos configurados.';
-                        bloquearBotones();
-                    }
-                } catch (err) {
-                    console.error("Detalle del error:", err);
-                    document.getElementById('pregunta').innerText = 'Error al conectar con Supabase: ' + err.message;
-                }
-            }
-
-            async function verificarVotoPrevio() {
-                if (!capituloActualId) return;
-                const { data } = await supabaseClient
-                    .from('votos')
-                    .select('opcion')
-                    .eq('capitulo_id', capituloActualId)
-                    .eq('user_id', userId)
+            try {
+                const { data, error } = await supabaseClient
+                    .from('capitulo_activo')
+                    .select('*')
+                    .limit(1)
                     .maybeSingle();
 
+                if (error) throw error;
+
                 if (data) {
-                    bloquearBotones();
-                    document.getElementById('mensaje').innerText = `✅ ¡Ya votaste por la opción: ${data.opcion}!`;
-                    document.getElementById('mensaje').style.color = 'green';
-                }
-            }
+                    capituloActualId = data.capitulo_id;
+                    document.getElementById('status').innerText = data.estado_personaje || 'Estado activo';
+                    document.getElementById('imagen').src = data.imagen_url || 'https://picsum.photos/400/200';
+                    document.getElementById('pregunta').innerText = data.pregunta || 'Sin pregunta definida';
+                    document.getElementById('btn_a').innerText = data.opcion_a || 'Opción A';
+                    document.getElementById('btn_b').innerText = data.opcion_b || 'Opción B';
+                    
+                    document.getElementById('btn_a').disabled = false;
+                    document.getElementById('btn_b').disabled = false;
+                    
+                    document.getElementById('btn_a').onclick = () => votar(capituloActualId, userId, 'A');
+                    document.getElementById('btn_b').onclick = () => votar(capituloActualId, userId, 'B');
 
-            async function votar(opcionSeleccionada) {
-                bloquearBotones();
-                document.getElementById('mensaje').innerText = 'Registrando voto...';
-
-                const { error } = await supabaseClient
-                    .from('votos')
-                    .insert([
-                        { capitulo_id: capituloActualId, user_id: userId, opcion: opcionSeleccionada }
-                    ]);
-
-                if (error) {
-                    console.error(error);
-                    if (error.code === '23505') {
-                        document.getElementById('mensaje').innerText = '⚠️ Ya habías votado anteriormente.';
-                        document.getElementById('mensaje').style.color = 'orange';
-                    } else {
-                        document.getElementById('mensaje').innerText = '❌ Error: ' + error.message;
-                        document.getElementById('mensaje').style.color = 'red';
-                    }
+                    verificarVotoPrevio(capituloActualId, userId);
                 } else {
-                    document.getElementById('mensaje').innerText = '🎉 ¡Voto registrado con éxito!';
-                    document.getElementById('mensaje').style.color = 'green';
-                    if (tg.HapticFeedback) {
-                        tg.HapticFeedback.notificationOccurred('success');
-                    }
+                    document.getElementById('pregunta').innerText = 'No hay capítulos activos configurados.';
+                    bloquearBotones();
+                }
+            } catch (err) {
+                console.error("Detalle del error:", err);
+                document.getElementById('pregunta').innerText = 'Error al conectar con Supabase: ' + err.message;
+            }
+        }
+
+        async function verificarVotoPrevio(capituloId, userId) {
+            const { data } = await supabaseClient
+                .from('votos')
+                .select('opcion')
+                .eq('capitulo_id', capituloId)
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (data) {
+                bloquearBotones();
+                document.getElementById('mensaje').innerText = `✅ ¡Ya votaste por la opción: ${data.opcion}!`;
+                document.getElementById('mensaje').style.color = 'green';
+            }
+        }
+
+        async function votar(capituloId, userId, opcionSeleccionada) {
+            bloquearBotones();
+            document.getElementById('mensaje').innerText = 'Registrando voto...';
+
+            const { error } = await supabaseClient
+                .from('votos')
+                .insert([
+                    { capitulo_id: capituloId, user_id: userId, opcion: opcionSeleccionada }
+                ]);
+
+            if (error) {
+                console.error(error);
+                if (error.code === '23505') {
+                    document.getElementById('mensaje').innerText = '⚠️ Ya habías votado anteriormente.';
+                    document.getElementById('mensaje').style.color = 'orange';
+                } else {
+                    document.getElementById('mensaje').innerText = '❌ Error: ' + error.message;
+                    document.getElementById('mensaje').style.color = 'red';
+                }
+            } else {
+                document.getElementById('mensaje').innerText = '🎉 ¡Voto registrado con éxito!';
+                document.getElementById('mensaje').style.color = 'green';
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
                 }
             }
+        }
 
-            function bloquearBotones() {
-                document.getElementById('btn_a').disabled = true;
-                document.getElementById('btn_b').disabled = true;
-            }
-
-            cargarCapitulo();
+        function bloquearBotones() {
+            document.getElementById('btn_a').disabled = true;
+            document.getElementById('btn_b').disabled = true;
         }
     </script>
 </body>
