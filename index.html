@@ -73,18 +73,18 @@
 <body>
 
     <div class="container" id="app">
-        <div id="status" class="status-badge">Cargando estado...</div>
-        <img id="imagen" src="" alt="Escena" onerror="this.src='https://picsum.photos/400/200'">
-        <div id="pregunta" class="question">Cargando historia...</div>
+        <div id="status" class="status-badge">Verificando acceso...</div>
+        <img id="imagen" src="https://picsum.photos/400/200" alt="Escena">
+        <div id="pregunta" class="question">Por favor, espera...</div>
         
-        <button id="btn_a" class="btn" onclick="votar('A')">Opción A</button>
-        <button id="btn_b" class="btn" onclick="votar('B')">Opción B</button>
+        <button id="btn_a" class="btn" disabled>Opción A</button>
+        <button id="btn_b" class="btn" disabled>Opción B</button>
         
         <div id="mensaje"></div>
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://cnhtbdzzcfvrdkqzrfjf.supabase.co';
+        const SUPABASE_URL = 'https://cnhtbduzzcfvrdkqzrfjf.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuaHRiZHp6Y2Z2cmRrcXpyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDUzMTcsImV4cCI6MjEwNzIyMTMxN30.nBKNHG4ArcWkctm8n-rF592wZ2Aa7MG4fS-qswboWD0';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -94,89 +94,106 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        const userId = tg.initDataUnsafe?.user?.id ? tg.initDataUnsafe.user.id.toString() : 'user_web_' + Math.floor(Math.random() * 100000);
+        // Validar si el usuario viene estrictamente de Telegram
+        const telegramUser = tg.initDataUnsafe?.user;
 
-        let capituloActualId = '';
+        if (!telegramUser || !telegramUser.id) {
+            // Si entra por navegador web externo, bloqueamos la app
+            document.getElementById('status').innerText = 'Acceso Denegado';
+            document.getElementById('pregunta').innerText = '⚠️ Esta Mini App solo puede ser utilizada desde el bot oficial en Telegram.';
+            document.getElementById('btn_a').style.display = 'none';
+            document.getElementById('btn_b').style.display = 'none';
+        } else {
+            // Si es un usuario legítimo de Telegram, procedemos normalmente
+            const userId = telegramUser.id.toString();
+            let capituloActualId = '';
 
-        async function cargarCapitulo() {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('capitulo_activo')
-                    .select('*')
-                    .limit(1)
+            async function cargarCapitulo() {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('capitulo_activo')
+                        .select('*')
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (error) throw error;
+
+                    if (data) {
+                        capituloActualId = data.capitulo_id;
+                        document.getElementById('status').innerText = data.estado_personaje || 'Estado activo';
+                        document.getElementById('imagen').src = data.imagen_url || 'https://picsum.photos/400/200';
+                        document.getElementById('pregunta').innerText = data.pregunta || 'Sin pregunta definida';
+                        document.getElementById('btn_a').innerText = data.opcion_a || 'Opción A';
+                        document.getElementById('btn_b').innerText = data.opcion_b || 'Opción B';
+                        
+                        document.getElementById('btn_a').disabled = false;
+                        document.getElementById('btn_b').disabled = false;
+                        
+                        document.getElementById('btn_a').onclick = () => votar('A');
+                        document.getElementById('btn_b').onclick = () => votar('B');
+
+                        verificarVotoPrevio();
+                    } else {
+                        document.getElementById('pregunta').innerText = 'No hay capítulos activos configurados.';
+                        bloquearBotones();
+                    }
+                } catch (err) {
+                    console.error("Detalle del error:", err);
+                    document.getElementById('pregunta').innerText = 'Error al conectar con Supabase: ' + err.message;
+                }
+            }
+
+            async function verificarVotoPrevio() {
+                if (!capituloActualId) return;
+                const { data } = await supabaseClient
+                    .from('votos')
+                    .select('opcion')
+                    .eq('capitulo_id', capituloActualId)
+                    .eq('user_id', userId)
                     .maybeSingle();
 
-                if (error) throw error;
-
                 if (data) {
-                    capituloActualId = data.capitulo_id;
-                    document.getElementById('status').innerText = data.estado_personaje || 'Estado activo';
-                    document.getElementById('imagen').src = data.imagen_url || 'https://picsum.photos/400/200';
-                    document.getElementById('pregunta').innerText = data.pregunta || 'Sin pregunta definida';
-                    document.getElementById('btn_a').innerText = data.opcion_a || 'Opción A';
-                    document.getElementById('btn_b').innerText = data.opcion_b || 'Opción B';
-
-                    verificarVotoPrevio();
-                } else {
-                    document.getElementById('pregunta').innerText = 'No hay capítulos activos configurados.';
                     bloquearBotones();
+                    document.getElementById('mensaje').innerText = `✅ ¡Ya votaste por la opción: ${data.opcion}!`;
+                    document.getElementById('mensaje').style.color = 'green';
                 }
-            } catch (err) {
-                console.error("Detalle del error:", err);
-                document.getElementById('pregunta').innerText = 'Error al conectar con Supabase: ' + err.message;
             }
-        }
 
-        async function verificarVotoPrevio() {
-            if (!capituloActualId) return;
-            const { data } = await supabaseClient
-                .from('votos')
-                .select('opcion')
-                .eq('capitulo_id', capituloActualId)
-                .eq('user_id', userId)
-                .maybeSingle();
-
-            if (data) {
+            async function votar(opcionSeleccionada) {
                 bloquearBotones();
-                document.getElementById('mensaje').innerText = `✅ ¡Ya votaste por la opción: ${data.opcion}!`;
-                document.getElementById('mensaje').style.color = 'green';
-            }
-        }
+                document.getElementById('mensaje').innerText = 'Registrando voto...';
 
-        async function votar(opcionSeleccionada) {
-            bloquearBotones();
-            document.getElementById('mensaje').innerText = 'Registrando voto...';
+                const { error } = await supabaseClient
+                    .from('votos')
+                    .insert([
+                        { capitulo_id: capituloActualId, user_id: userId, opcion: opcionSeleccionada }
+                    ]);
 
-            const { error } = await supabaseClient
-                .from('votos')
-                .insert([
-                    { capitulo_id: capituloActualId, user_id: userId, opcion: opcionSeleccionada }
-                ]);
-
-            if (error) {
-                console.error(error);
-                if (error.code === '23505') {
-                    document.getElementById('mensaje').innerText = '⚠️ Ya habías votado anteriormente.';
-                    document.getElementById('mensaje').style.color = 'orange';
+                if (error) {
+                    console.error(error);
+                    if (error.code === '23505') {
+                        document.getElementById('mensaje').innerText = '⚠️ Ya habías votado anteriormente.';
+                        document.getElementById('mensaje$.style.color = 'orange';
+                    } else {
+                        document.getElementById('mensaje').innerText = '❌ Error: ' + error.message;
+                        document.getElementById('mensaje').style.color = 'red';
+                    }
                 } else {
-                    document.getElementById('mensaje').innerText = '❌ Error: ' + error.message;
-                    document.getElementById('mensaje').style.color = 'red';
-                }
-            } else {
-                document.getElementById('mensaje').innerText = '🎉 ¡Voto registrado con éxito!';
-                document.getElementById('mensaje').style.color = 'green';
-                if (tg.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred('success');
+                    document.getElementById('mensaje').innerText = '🎉 ¡Voto registrado con éxito!';
+                    document.getElementById('mensaje').style.color = 'green';
+                    if (tg.HapticFeedback) {
+                        tg.HapticFeedback.notificationOccurred('success');
+                    }
                 }
             }
-        }
 
-        function bloquearBotones() {
-            document.getElementById('btn_a').disabled = true;
-            document.getElementById('btn_b').disabled = true;
-        }
+            function bloquearBotones() {
+                document.getElementById('btn_a').disabled = true;
+                document.getElementById('btn_b').disabled = true;
+            }
 
-        cargarCapitulo();
+            cargarCapitulo();
+        }
     </script>
 </body>
 </html>
