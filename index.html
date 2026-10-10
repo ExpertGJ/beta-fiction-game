@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Narrativa Interactiva</title>
-    <!-- SDK oficial de Telegram Web App -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Librería de Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
@@ -39,6 +37,7 @@
             border-radius: 12px;
             object-fit: cover;
             max-height: 250px;
+            background-color: #eee;
         }
         .question {
             font-size: 16px;
@@ -75,7 +74,7 @@
 
     <div class="container" id="app">
         <div id="status" class="status-badge">Cargando estado...</div>
-        <img id="imagen" src="" alt="Escena">
+        <img id="imagen" src="" alt="Escena" onerror="this.src='https://picsum.photos/400/200'">
         <div id="pregunta" class="question">Cargando historia...</div>
         
         <button id="btn_a" class="btn" onclick="votar('A')">Opción A</button>
@@ -85,54 +84,50 @@
     </div>
 
     <script>
-        // CONFIGURACIÓN DE SUPABASE (Ya integrada con tus credenciales)
         const SUPABASE_URL = 'https://cnhtbduzzcfvrdkqzrfjf.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_ZwqK_SmjJrkxPprUe07C1w_cDTfe_46';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // Inicializar Telegram Web App
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // Obtener ID único del usuario de Telegram (o generar uno temporal si se abre en navegador web común)
-        const userId = tg.initDataUnsafe?.user?.id ? tg.initDataUnsafe.user.id.toString() : 'user_web_prueba_' + Math.floor(Math.random() * 100000);
+        const userId = tg.initDataUnsafe?.user?.id ? tg.initDataUnsafe.user.id.toString() : 'user_web_' + Math.floor(Math.random() * 100000);
 
         let capituloActualId = '';
 
         async function cargarCapitulo() {
             try {
-                // Traer el capítulo activo actual de Supabase
                 const { data, error } = await supabaseClient
                     .from('capitulo_activo')
                     .select('*')
                     .limit(1)
-                    .single();
+                    .maybeSingle();
 
                 if (error) throw error;
 
                 if (data) {
                     capituloActualId = data.capitulo_id;
-                    document.getElementById('status').innerText = data.estado_personaje;
-                    document.getElementById('imagen').src = data.imagen_url;
-                    document.getElementById('pregunta').innerText = data.pregunta;
-                    document.getElementById('btn_a').innerText = data.opcion_a;
-                    document.getElementById('btn_b').innerText = data.opcion_b;
+                    document.getElementById('status').innerText = data.estado_personaje || 'Estado activo';
+                    document.getElementById('imagen').src = data.imagen_url || 'https://picsum.photos/400/200';
+                    document.getElementById('pregunta').innerText = data.pregunta || 'Sin pregunta definida';
+                    document.getElementById('btn_a').innerText = data.opcion_a || 'Opción A';
+                    document.getElementById('btn_b').innerText = data.opcion_b || 'Opción B';
 
-                    // Verificar si el usuario ya votó en este capítulo
                     verificarVotoPrevio();
                 } else {
-                    document.getElementById('pregunta').innerText = 'No hay capítulos activos en este momento.';
+                    document.getElementById('pregunta').innerText = 'No hay capítulos activos configurados.';
                     bloquearBotones();
                 }
             } catch (err) {
                 console.error(err);
-                document.getElementById('pregunta').innerText = 'Error al conectar con la base de datos.';
+                document.getElementById('pregunta').innerText = 'Error al conectar: ' + err.message;
             }
         }
 
         async function verificarVotoPrevio() {
-            const { data, error } = await supabaseClient
+            if (!capituloActualId) return;
+            const { data } = await supabaseClient
                 .from('votos')
                 .select('opcion')
                 .eq('capitulo_id', capituloActualId)
@@ -141,14 +136,14 @@
 
             if (data) {
                 bloquearBotones();
-                document.getElementById('mensaje').innerText = `✅ ¡Ya registramos tu voto por la opción: ${data.opcion}!`;
+                document.getElementById('mensaje').innerText = `✅ ¡Ya votaste por la opción: ${data.opcion}!`;
                 document.getElementById('mensaje').style.color = 'green';
             }
         }
 
         async function votar(opcionSeleccionada) {
             bloquearBotones();
-            document.getElementById('mensaje').innerText = 'Enviando voto...';
+            document.getElementById('mensaje').innerText = 'Registrando voto...';
 
             const { error } = await supabaseClient
                 .from('votos')
@@ -162,14 +157,12 @@
                     document.getElementById('mensaje').innerText = '⚠️ Ya habías votado anteriormente.';
                     document.getElementById('mensaje').style.color = 'orange';
                 } else {
-                    document.getElementById('mensaje').innerText = '❌ Error al registrar el voto.';
+                    document.getElementById('mensaje').innerText = '❌ Error: ' + error.message;
                     document.getElementById('mensaje').style.color = 'red';
                 }
             } else {
                 document.getElementById('mensaje').innerText = '🎉 ¡Voto registrado con éxito!';
                 document.getElementById('mensaje').style.color = 'green';
-                
-                // Vibración háptica nativa en Telegram si está disponible
                 if (tg.HapticFeedback) {
                     tg.HapticFeedback.notificationOccurred('success');
                 }
@@ -181,7 +174,6 @@
             document.getElementById('btn_b').disabled = true;
         }
 
-        // Ejecutar al cargar la página
         cargarCapitulo();
     </script>
 </body>
