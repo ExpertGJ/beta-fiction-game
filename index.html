@@ -22,26 +22,33 @@
             width: 100%;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 12px;
         }
-        .status-badge {
-            background: rgba(0,0,0,0.05);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 14px;
+        .stats-box {
+            background: rgba(0,0,0,0.04);
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 13px;
             font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
             text-align: center;
         }
         img {
             width: 100%;
             border-radius: 12px;
             object-fit: cover;
-            max-height: 250px;
+            max-height: 220px;
             background-color: #eee;
         }
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+        }
         .question {
-            font-size: 16px;
-            font-weight: 500;
+            font-size: 15px;
             line-height: 1.4;
             text-align: center;
         }
@@ -51,50 +58,57 @@
             border: none;
             padding: 14px;
             border-radius: 10px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
             cursor: pointer;
             width: 100%;
-            transition: opacity 0.2s;
-            text-decoration: none;
-            display: inline-block;
-            box-sizing: border-box;
             text-align: center;
-        }
-        .btn:active {
-            opacity: 0.8;
         }
         .btn:disabled {
             background-color: #cccccc;
             cursor: not-allowed;
         }
-        #mensaje {
+        .btn-next {
+            background-color: #28a745;
+            display: none;
+        }
+        .results-box {
+            background: #f1f3f5;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            display: none;
             text-align: center;
-            font-weight: 600;
-            margin-top: 10px;
         }
         .blocked-card {
             background: #fff3cd;
             color: #856404;
-            border: 1px solid #ffeeba;
             padding: 20px;
             border-radius: 12px;
             text-align: center;
-            line-height: 1.5;
         }
     </style>
 </head>
 <body>
 
     <div class="container" id="app">
-        <div id="status" class="status-badge">Verificando acceso...</div>
-        <img id="imagen" src="https://picsum.photos/400/200" alt="Escena" referrerpolicy="no-referrer">
+        <!-- Panel de Estado Personal -->
+        <div class="stats-box" id="stats-panel">
+            <div>⚖️ Reputación: <span id="stat-rep">50</span>% | ⚡ Vitalidad: <span id="stat-vit">100</span>% | 🎯 Progreso: <span id="stat-prog">0</span>%</div>
+        </div>
+
+        <img id="imagen" src="https://picsum.photos/400/200?random=1" alt="Escena" referrerpolicy="no-referrer">
+        <div id="titulo" class="title">Cargando...</div>
         <div id="pregunta" class="question">Por favor, espera...</div>
         
         <button id="btn_a" class="btn" disabled>Opción A</button>
         <button id="btn_b" class="btn" disabled>Opción B</button>
-        
-        <div id="mensaje"></div>
+
+        <!-- Resultados de la comunidad tras votar -->
+        <div id="resultados-comunidad" class="results-box"></div>
+
+        <!-- Botón para avanzar -->
+        <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
     </div>
 
     <script>
@@ -108,137 +122,131 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // ---- Manejo de imagen con respaldo ----
-        const imgEl = document.getElementById('imagen');
+        // Estado local del jugador (Escala 0 a 100)
+        let jugador = {
+            reputacion: 50,
+            vitalidad: 100,
+            progreso: 0
+        };
 
-        function urlRespaldo() {
-            // Foto aleatoria distinta cada vez
-            return 'https://picsum.photos/400/200?random=' + Date.now();
+        let capituloActualId = 'cap_1'; // Empezamos en el Capítulo 1
+
+        function ajustarEscala(actual, delta) {
+            return Math.min(100, Math.max(0, actual + delta));
         }
 
-        let intentosRespaldo = 0;
-        imgEl.addEventListener('error', () => {
-            // Si falla el link (o el respaldo), prueba otro respaldo máximo 2 veces
-            if (intentosRespaldo < 2) {
-                intentosRespaldo++;
-                imgEl.src = urlRespaldo();
-            }
-        });
-
-        function mostrarImagen(url) {
-            intentosRespaldo = 0;
-            const limpia = (url || '').trim();
-            imgEl.src = limpia ? limpia : urlRespaldo();
+        function actualizarPanelStats() {
+            document.getElementById('stat-rep').innerText = jugador.reputacion;
+            document.getElementById('stat-vit').innerText = jugador.vitalidad;
+            document.getElementById('stat-prog').innerText = jugador.progreso;
         }
-        // ---------------------------------------
 
-        // Damos un pequeño respiro para que el SDK de Telegram cargue sus datos si se abrió desde el bot
         setTimeout(() => {
             const telegramUser = tg.initDataUnsafe?.user;
-
             if (!telegramUser || !telegramUser.id) {
-                // Si no hay usuario de Telegram, mostramos el aviso bloqueado inmediatamente
-                document.getElementById('status').innerText = '🔒 Acceso restringido';
-                document.getElementById('imagen').style.display = 'none';
-                document.getElementById('btn_a').style.display = 'none';
-                document.getElementById('btn_b').style.display = 'none';
-                
-                document.getElementById('pregunta').innerHTML = `
+                document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
-                        <h3>¡Atención!</h3>
-                        <p>Esta aventura interactiva está diseñada para jugarse exclusivamente desde nuestra <strong>Mini App oficial en Telegram</strong>.</p>
-                        <p>Por favor, abre nuestro bot en Telegram para votar y participar con tu comunidad.</p>
+                        <h3>Acceso Restringido</h3>
+                        <p>Abre esta Mini App directamente desde Telegram para jugar.</p>
                     </div>
                 `;
             } else {
-                // Si es un usuario válido de Telegram, cargamos el juego con normalidad
-                iniciarJuego(telegramUser.id.toString());
+                cargarCapitulo(capituloActualId);
             }
         }, 500);
 
-        async function iniciarJuego(userId) {
-            let capituloActualId = '';
+        async function cargarCapitulo(idCapitulo) {
+            document.getElementById('resultados-comunidad').style.display = 'none';
+            document.getElementById('btn_next').style.display = 'none';
+            document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
 
-            try {
-                const { data, error } = await supabaseClient
-                    .from('capitulo_activo')
-                    .select('*')
-                    .limit(1)
-                    .maybeSingle();
-
-                if (error) throw error;
-
-                if (data) {
-                    capituloActualId = data.capitulo_id;
-                    document.getElementById('status').innerText = data.estado_personaje || 'Estado activo';
-                    mostrarImagen(data.imagen_url);
-                    document.getElementById('pregunta').innerText = data.pregunta || 'Sin pregunta definida';
-                    document.getElementById('btn_a').innerText = data.opcion_a || 'Opción A';
-                    document.getElementById('btn_b').innerText = data.opcion_b || 'Opción B';
-                    
-                    document.getElementById('btn_a').disabled = false;
-                    document.getElementById('btn_b').disabled = false;
-                    
-                    document.getElementById('btn_a').onclick = () => votar(capituloActualId, userId, 'A');
-                    document.getElementById('btn_b').onclick = () => votar(capituloActualId, userId, 'B');
-
-                    verificarVotoPrevio(capituloActualId, userId);
-                } else {
-                    document.getElementById('pregunta').innerText = 'No hay capítulos activos configurados.';
-                    bloquearBotones();
-                }
-            } catch (err) {
-                console.error("Detalle del error:", err);
-                document.getElementById('pregunta').innerText = 'Error al conectar con Supabase: ' + err.message;
-            }
-        }
-
-        async function verificarVotoPrevio(capituloId, userId) {
-            const { data } = await supabaseClient
-                .from('votos')
-                .select('opcion')
-                .eq('capitulo_id', capituloId)
-                .eq('user_id', userId)
+            const { data, error } = await supabaseClient
+                .from('capitulos')
+                .select('*')
+                .eq('id', idCapitulo)
                 .maybeSingle();
 
-            if (data) {
-                bloquearBotones();
-                document.getElementById('mensaje').innerText = `✅ ¡Ya votaste por la opción: ${data.opcion}!`;
-                document.getElementById('mensaje').style.color = 'green';
+            if (error || !data) {
+                document.getElementById('titulo').innerText = '🏆 Fin de la Aventura';
+                document.getElementById('pregunta').innerText = 'Has completado todos los capítulos de la historia.';
+                document.getElementById('btn_a').style.display = 'none';
+                document.getElementById('btn_b').style.display = 'none';
+                mostrarPantallaFinal();
+                return;
             }
+
+            document.getElementById('titulo').innerText = data.titulo;
+            document.getElementById('pregunta').innerText = data.descripcion;
+            
+            const btnA = document.getElementById('btn_a');
+            const btnB = document.getElementById('btn_b');
+
+            btnA.innerText = data.opcion_a_texto;
+            btnB.innerText = data.opcion_b_texto;
+            btnA.disabled = false;
+            btnB.disabled = false;
+            btnA.style.display = 'block';
+            btnB.style.display = 'block';
+
+            btnA.onclick = () => procesarVoto('A', data.opcion_a_siguiente, data.opcion_a_rep, data.opcion_a_vit, data.opcion_a_prog);
+            btnB.onclick = () => procesarVoto('B', data.opcion_b_siguiente, data.opcion_b_rep, data.opcion_b_vit, data.opcion_b_prog);
         }
 
-        async function votar(capituloId, userId, opcionSeleccionada) {
-            bloquearBotones();
-            document.getElementById('mensaje').innerText = 'Registrando voto...';
-
-            const { error } = await supabaseClient
-                .from('votos')
-                .insert([
-                    { capitulo_id: capituloId, user_id: userId, opcion: opcionSeleccionada }
-                ]);
-
-            if (error) {
-                console.error(error);
-                if (error.code === '23505') {
-                    document.getElementById('mensaje').innerText = '⚠️ Ya habías votado anteriormente.';
-                    document.getElementById('mensaje').style.color = 'orange';
-                } else {
-                    document.getElementById('mensaje').innerText = '❌ Error: ' + error.message;
-                    document.getElementById('mensaje').style.color = 'red';
-                }
-            } else {
-                document.getElementById('mensaje').innerText = '🎉 ¡Voto registrado con éxito!';
-                document.getElementById('mensaje').style.color = 'green';
-                if (tg.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred('success');
-                }
-            }
-        }
-
-        function bloquearBotones() {
+        async function procesarVoto(opcionElegida, siguienteId, dRep, dVit, dProg) {
+            const telegramUser = tg.initDataUnsafe?.user;
+            
+            // 1. Desactivar botones
             document.getElementById('btn_a').disabled = true;
             document.getElementById('btn_b').disabled = true;
+
+            // 2. Actualizar variables individuales del jugador
+            jugador.reputacion = ajustarEscala(jugador.reputacion, dRep);
+            jugador.vitalidad = ajustarEscala(jugador.vitalidad, dVit);
+            jugador.progreso = ajustarEscala(jugador.progreso, dProg);
+            actualizarPanelStats();
+
+            // 3. Guardar voto en Supabase
+            await supabaseClient.from('votos').insert([
+                { user_id: telegramUser.id.toString(), capitulo_id: capituloActualId, opcion: opcionElegida }
+            ]);
+
+            // 4. Consultar estadísticas comunitarias de este capítulo
+            const { data: todosVotos } = await supabaseClient
+                .from('votos')
+                .select('opcion')
+                .eq('capitulo_id', capituloActualId);
+
+            const total = todosVotos.length;
+            const votosA = todosVotos.filter(v => v.opcion === 'A').length;
+            const votosB = total - votosA;
+            const porcA = total > 0 ? Math.round((votosA / total) * 100) : 0;
+            const porcB = total > 0 ? 100 - porcA : 0;
+
+            // 5. Mostrar porcentajes en pantalla
+            const resBox = document.getElementById('resultados-comunidad');
+            resBox.innerHTML = `
+                <strong>📊 Estadísticas de la Comunidad (${total} votos totales):</strong><br>
+                Opción A: <strong>${porcA}%</strong> (${votosA} votos)<br>
+                Opción B: <strong>${porcB}%</strong> (${votosB} votos)
+            `;
+            resBox.style.display = 'block';
+
+            // 6. Configurar y mostrar botón siguiente
+            const btnNext = document.getElementById('btn_next');
+            btnNext.style.display = 'block';
+            btnNext.onclick = () => {
+                capituloActualId = siguienteId;
+                cargarCapitulo(siguienteId);
+            };
+
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        function mostrarPantallaFinal() {
+            document.getElementById('stats-panel').innerHTML = `
+                <h3>📊 Tu Resultado Final</h3>
+                <p>⚖️ Reputación: <strong>${jugador.reputacion}%</strong> | ⚡ Vitalidad: <strong>${jugador.vitalidad}%</strong> | 🎯 Progreso: <strong>${jugador.progreso}%</strong></p>
+            `;
         }
     </script>
 </body>
