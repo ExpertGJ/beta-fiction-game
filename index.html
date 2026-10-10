@@ -87,7 +87,9 @@
         const SUPABASE_URL = 'https://cnhtbduzzcfvrdkqzrfjf.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuaHRiZHp6Y2Z2cmRrcXpyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDUzMTcsImV4cCI6MjEwNzIyMTMxN30.nBKNHG4ArcWkctm8n-rF592wZ2Aa7MG4fS-qswboWD0';
         
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: false }
+        });
 
         const tg = window.Telegram.WebApp;
         tg.expand();
@@ -98,6 +100,7 @@
 
         async function cargarCapitulo() {
             try {
+                // Validación de conectividad previa
                 const { data, error } = await supabaseClient
                     .from('capitulo_activo')
                     .select('*')
@@ -120,8 +123,8 @@
                     bloquearBotones();
                 }
             } catch (err) {
-                console.error(err);
-                document.getElementById('pregunta').innerText = 'Error al conectar: ' + err.message;
+                console.error("Detalle del error:", err);
+                document.getElementById('pregunta').innerText = 'Error de conexión con Supabase. Revisa si usas bloqueadores (Brave Shields) o extensiones.';
             }
         }
 
@@ -162,7 +165,7 @@
                 }
             } else {
                 document.getElementById('mensaje').innerText = '🎉 ¡Voto registrado con éxito!';
-                document.getElementById('mensaje').style.color = 'green';
+                document.getElementById('mensaje$.style.color = 'green';
                 if (tg.HapticFeedback) {
                     tg.HapticFeedback.notificationOccurred('success');
                 }
