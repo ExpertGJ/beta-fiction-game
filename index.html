@@ -43,6 +43,7 @@
             font-size: 16px;
             font-weight: 500;
             line-height: 1.4;
+            text-align: center;
         }
         .btn {
             background-color: var(--tg-theme-button-color, #2481cc);
@@ -55,6 +56,10 @@
             cursor: pointer;
             width: 100%;
             transition: opacity 0.2s;
+            text-decoration: none;
+            display: inline-block;
+            box-sizing: border-box;
+            text-align: center;
         }
         .btn:active {
             opacity: 0.8;
@@ -67,6 +72,15 @@
             text-align: center;
             font-weight: 600;
             margin-top: 10px;
+        }
+        .blocked-card {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -94,17 +108,24 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // Validar si el usuario viene estrictamente de Telegram
         const telegramUser = tg.initDataUnsafe?.user;
 
         if (!telegramUser || !telegramUser.id) {
-            // Si entra por navegador web externo, bloqueamos la app
-            document.getElementById('status').innerText = 'Acceso Denegado';
-            document.getElementById('pregunta').innerText = '⚠️ Esta Mini App solo puede ser utilizada desde el bot oficial en Telegram.';
+            // Si el usuario entra por navegador web externo, mostramos el aviso explicativo
+            document.getElementById('status').innerText = '🔒 Acceso restringido';
+            document.getElementById('imagen').style.display = 'none';
             document.getElementById('btn_a').style.display = 'none';
             document.getElementById('btn_b').style.display = 'none';
+            
+            document.getElementById('pregunta').innerHTML = `
+                <div class="blocked-card">
+                    <h3>⚠️ ¡Atención!</h3>
+                    <p>Esta aventura interactiva está diseñada para jugarse exclusivamente desde nuestra <strong>Mini App oficial en Telegram</strong>.</p>
+                    <p>Por favor, abre nuestro bot en Telegram para votar y participar con tu comunidad.</p>
+                </div>
+            `;
         } else {
-            // Si es un usuario legítimo de Telegram, procedemos normalmente
+            // Si entra desde Telegram, la app funciona normalmente
             const userId = telegramUser.id.toString();
             let capituloActualId = '';
 
@@ -173,7 +194,7 @@
                     console.error(error);
                     if (error.code === '23505') {
                         document.getElementById('mensaje').innerText = '⚠️ Ya habías votado anteriormente.';
-                        document.getElementById('mensaje$.style.color = 'orange';
+                        document.getElementById('mensaje').style.color = 'orange';
                     } else {
                         document.getElementById('mensaje').innerText = '❌ Error: ' + error.message;
                         document.getElementById('mensaje').style.color = 'red';
