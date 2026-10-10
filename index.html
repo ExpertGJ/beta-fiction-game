@@ -28,7 +28,7 @@
             background: rgba(0,0,0,0.04);
             padding: 10px;
             border-radius: 10px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             display: flex;
             flex-direction: column;
@@ -42,6 +42,11 @@
             letter-spacing: 0.5px;
             margin-bottom: 2px;
         }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+        }
         img {
             width: 100%;
             border-radius: 12px;
@@ -49,7 +54,6 @@
             max-height: 220px;
             background-color: #eee;
         }
-        /* Estilos para las barritas de progreso debajo de la imagen */
         .progress-bars {
             display: flex;
             gap: 6px;
@@ -110,22 +114,22 @@
 <body>
 
     <div class="container" id="app">
-        <!-- Panel Superior: Promedios Comunitarios Globales (Sin Progreso) -->
+        <!-- Panel Superior: Promedios Comunitarios Globales con 4 Atributos Dinámicos -->
         <div class="stats-box" id="stats-panel">
             <div class="community-header">🌍 Promedio Global de la Comunidad</div>
-            <div>⚖️ Rep.: <span id="comm-rep">50</span>% | ⚡ Vit.: <span id="comm-vit">100</span>%</div>
+            <div class="stats-grid">
+                <div><span id="lbl-attr1">Attr 1</span>: <span id="comm-attr1">50</span>%</div>
+                <div><span id="lbl-attr2">Attr 2</span>: <span id="comm-attr2">50</span>%</div>
+                <div><span id="lbl-attr3">Attr 3</span>: <span id="comm-attr3">50</span>%</div>
+                <div><span id="lbl-attr4">Attr 4</span>: <span id="comm-attr4">50</span>%</div>
+            </div>
             <div style="font-size: 11px; color: #444; margin-top: 2px;">👥 Partidas Totales: <span id="comm-total">0</span></div>
         </div>
 
         <img id="imagen" src="https://picsum.photos/400/200?random=1" alt="Escena" referrerpolicy="no-referrer">
         
         <!-- Barritas de Progreso Dinámicas -->
-        <div class="progress-bars" id="progress-bars-container">
-            <div class="bar active"></div>
-            <div class="bar"></div>
-            <div class="bar"></div>
-            <div class="bar"></div>
-        </div>
+        <div class="progress-bars" id="progress-bars-container"></div>
 
         <div id="titulo" class="title">Cargando...</div>
         <div id="pregunta" class="question">Por favor, espera...</div>
@@ -133,7 +137,6 @@
         <button id="btn_a" class="btn" disabled>Opción A</button>
         <button id="btn_b" class="btn" disabled>Opción B</button>
 
-        <!-- Botón para avanzar -->
         <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
     </div>
 
@@ -148,16 +151,27 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
+        // Nombres por defecto (se sobrescriben con los de Supabase)
+        let nombresAtributos = {
+            attr1: 'Atributo 1',
+            attr2: 'Atributo 2',
+            attr3: 'Atributo 3',
+            attr4: 'Atributo 4'
+        };
+
         let jugador = {
-            reputacion: 50,
-            vitalidad: 100,
-            progreso: 0
+            attr1: 50,
+            attr2: 50,
+            attr3: 50,
+            attr4: 50
         };
 
         let capituloActualId = 'cap_1';
-
-        // Definimos el orden de los capítulos para las barritas de progreso (Asumiendo una ruta de 4 capítulos totales)
         const rutaCapitulos = ['cap_1', 'cap_2a', 'cap_3', 'fin']; 
+
+        function ajustarEscala(actual, delta) {
+            return Math.min(100, Math.max(0, actual + delta));
+        }
 
         function actualizarBarritasProgreso(idActual) {
             let index = rutaCapitulos.indexOf(idActual);
@@ -174,8 +188,25 @@
             contenedor.innerHTML = htmlBarritas;
         }
 
-        function ajustarEscala(actual, delta) {
-            return Math.min(100, Math.max(0, actual + delta));
+        // Carga los nombres configurados en Supabase
+        async function cargarConfiguracionHistoria() {
+            const { data } = await supabaseClient
+                .from('config_historia')
+                .select('*')
+                .eq('id', 'actual')
+                .maybeSingle();
+
+            if (data) {
+                nombresAtributos.attr1 = data.attr_1_nombre;
+                nombresAtributos.attr2 = data.attr_2_nombre;
+                nombresAtributos.attr3 = data.attr_3_nombre;
+                nombresAtributos.attr4 = data.attr_4_nombre;
+
+                document.getElementById('lbl-attr1').innerText = data.attr_1_nombre;
+                document.getElementById('lbl-attr2').innerText = data.attr_2_nombre;
+                document.getElementById('lbl-attr3').innerText = data.attr_3_nombre;
+                document.getElementById('lbl-attr4').innerText = data.attr_4_nombre;
+            }
         }
 
         async function actualizarEstadisticasComunidad() {
@@ -184,35 +215,29 @@
                 .select('*');
 
             if (error || !todosLosVotos || todosLosVotos.length === 0) {
-                document.getElementById('comm-rep').innerText = 50;
-                document.getElementById('comm-vit').innerText = 100;
                 document.getElementById('comm-total').innerText = 0;
                 return;
             }
 
             let totalPartidas = todosLosVotos.length;
-            let sumaRep = 50 * totalPartidas;
-            let sumaVit = 100 * totalPartidas;
+            let a1 = 50 * totalPartidas, a2 = 50 * totalPartidas, a3 = 50 * totalPartidas, a4 = 50 * totalPartidas;
 
             todosLosVotos.forEach(v => {
                 if (v.opcion === 'A') {
-                    sumaRep += 10;
-                    sumaVit -= 15;
+                    a1 += 10; a2 -= 5; a3 += 10; a4 -= 10;
                 } else {
-                    sumaRep += 5;
-                    sumaVit -= 5;
+                    a1 -= 5; a2 += 10; a3 -= 5; a4 += 5;
                 }
             });
 
-            let promRep = Math.round(sumaRep / totalPartidas);
-            let promVit = Math.round(sumaVit / totalPartidas);
-
-            document.getElementById('comm-rep').innerText = Math.min(100, Math.max(0, promRep));
-            document.getElementById('comm-vit').innerText = Math.min(100, Math.max(0, promVit));
+            document.getElementById('comm-attr1').innerText = Math.min(100, Math.max(0, Math.round(a1 / totalPartidas)));
+            document.getElementById('comm-attr2').innerText = Math.min(100, Math.max(0, Math.round(a2 / totalPartidas)));
+            document.getElementById('comm-attr3').innerText = Math.min(100, Math.max(0, Math.round(a3 / totalPartidas)));
+            document.getElementById('comm-attr4').innerText = Math.min(100, Math.max(0, Math.round(a4 / totalPartidas)));
             document.getElementById('comm-total').innerText = totalPartidas;
         }
 
-        setTimeout(() => {
+        setTimeout(async () => {
             const telegramUser = tg.initDataUnsafe?.user;
             if (!telegramUser || !telegramUser.id) {
                 document.getElementById('app').innerHTML = `
@@ -222,6 +247,7 @@
                     </div>
                 `;
             } else {
+                await cargarConfiguracionHistoria();
                 actualizarEstadisticasComunidad();
                 cargarCapitulo(capituloActualId);
             }
@@ -240,7 +266,9 @@
 
             if (error || !data) {
                 document.getElementById('titulo').innerText = '🏆 Fin de la Aventura';
-                document.getElementById('pregunta').innerText = `Has completado la historia.\n\n📊 Tu Resultado Individual:\n⚖️ Reputación: ${jugador.reputacion}% | ⚡ Vitalidad: ${jugador.vitalidad}%`;
+                document.getElementById('pregunta').innerText = `Has completado la historia.\n\n📊 Tu Resultado Individual:\n` +
+                    `${nombresAtributos.attr1}: ${jugador.attr1}% | ${nombresAtributos.attr2}: ${jugador.attr2}%\n` +
+                    `${nombresAtributos.attr3}: ${jugador.attr3}% | ${nombresAtributos.attr4}: ${jugador.attr4}%`;
                 document.getElementById('btn_a').style.display = 'none';
                 document.getElementById('btn_b').style.display = 'none';
                 document.getElementById('progress-bars-container').style.display = 'none';
@@ -260,19 +288,20 @@
             btnA.style.display = 'block';
             btnB.style.display = 'block';
 
-            btnA.onclick = () => procesarVoto('A', data.opcion_a_siguiente, data.opcion_a_rep, data.opcion_a_vit, data.opcion_a_prog, data);
-            btnB.onclick = () => procesarVoto('B', data.opcion_b_siguiente, data.opcion_b_rep, data.opcion_b_vit, data.opcion_b_prog, data);
+            btnA.onclick = () => procesarVoto('A', data.opcion_a_siguiente, data.opcion_a_attr1, data.opcion_a_attr2, data.opcion_a_attr3, data.opcion_a_attr4, data);
+            btnB.onclick = () => procesarVoto('B', data.opcion_b_siguiente, data.opcion_b_attr1, data.opcion_b_attr2, data.opcion_b_attr3, data.opcion_b_attr4, data);
         }
 
-        async function procesarVoto(opcionElegida, siguienteId, dRep, dVit, dProg, datosCap) {
+        async function procesarVoto(opcionElegida, siguienteId, dA1, dA2, dA3, dA4, datosCap) {
             const telegramUser = tg.initDataUnsafe?.user;
             
             document.getElementById('btn_a').disabled = true;
             document.getElementById('btn_b').disabled = true;
 
-            jugador.reputacion = ajustarEscala(jugador.reputacion, dRep);
-            jugador.vitalidad = ajustarEscala(jugador.vitalidad, dVit);
-            jugador.progreso = ajustarEscala(jugador.progreso, dProg);
+            jugador.attr1 = ajustarEscala(jugador.attr1, dA1 || 0);
+            jugador.attr2 = ajustarEscala(jugador.attr2, dA2 || 0);
+            jugador.attr3 = ajustarEscala(jugador.attr3, dA3 || 0);
+            jugador.attr4 = ajustarEscala(jugador.attr4, dA4 || 0);
 
             await supabaseClient.from('votos').insert([
                 { user_id: telegramUser.id.toString(), capitulo_id: capituloActualId, opcion: opcionElegida }
