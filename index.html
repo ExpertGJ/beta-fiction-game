@@ -88,7 +88,7 @@
 
     <div class="container" id="app">
         <div id="status" class="status-badge">Verificando acceso...</div>
-        <img id="imagen" src="https://picsum.photos/400/200" alt="Escena">
+        <img id="imagen" src="https://picsum.photos/400/200" alt="Escena" referrerpolicy="no-referrer">
         <div id="pregunta" class="question">Por favor, espera...</div>
         
         <button id="btn_a" class="btn" disabled>Opción A</button>
@@ -107,6 +107,30 @@
 
         const tg = window.Telegram.WebApp;
         tg.expand();
+
+        // ---- Manejo de imagen con respaldo ----
+        const imgEl = document.getElementById('imagen');
+
+        function urlRespaldo() {
+            // Foto aleatoria distinta cada vez
+            return 'https://picsum.photos/400/200?random=' + Date.now();
+        }
+
+        let intentosRespaldo = 0;
+        imgEl.addEventListener('error', () => {
+            // Si falla el link (o el respaldo), prueba otro respaldo máximo 2 veces
+            if (intentosRespaldo < 2) {
+                intentosRespaldo++;
+                imgEl.src = urlRespaldo();
+            }
+        });
+
+        function mostrarImagen(url) {
+            intentosRespaldo = 0;
+            const limpia = (url || '').trim();
+            imgEl.src = limpia ? limpia : urlRespaldo();
+        }
+        // ---------------------------------------
 
         // Damos un pequeño respiro para que el SDK de Telegram cargue sus datos si se abrió desde el bot
         setTimeout(() => {
@@ -147,7 +171,7 @@
                 if (data) {
                     capituloActualId = data.capitulo_id;
                     document.getElementById('status').innerText = data.estado_personaje || 'Estado activo';
-                    document.getElementById('imagen').src = data.imagen_url || 'https://picsum.photos/400/200';
+                    mostrarImagen(data.imagen_url);
                     document.getElementById('pregunta').innerText = data.pregunta || 'Sin pregunta definida';
                     document.getElementById('btn_a').innerText = data.opcion_a || 'Opción A';
                     document.getElementById('btn_b').innerText = data.opcion_b || 'Opción B';
