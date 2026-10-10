@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Narrativa Interactiva</title>
+    <!-- SDK oficial de Telegram Web App -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Librería de Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 480px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .status-badge {
+            background: rgba(0,0,0,0.05);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+        }
+        img {
+            width: 100%;
+            border-radius: 12px;
+            object-fit: cover;
+            max-height: 250px;
+        }
+        .question {
+            font-size: 16px;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+        .btn {
+            background-color: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: opacity 0.2s;
+        }
+        .btn:active {
+            opacity: 0.8;
+        }
+        .btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #mensaje {
+            text-align: center;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="app">
+        <div id="status" class="status-badge">Cargando estado...</div>
+        <img id="imagen" src="" alt="Escena">
+        <div id="pregunta" class="question">Cargando historia...</div>
+        
+        <button id="btn_a" class="btn" onclick="votar('A')">Opción A</button>
+        <button id="btn_b" class="btn" onclick="votar('B')">Opción B</button>
+        
+        <div id="mensaje"></div>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN DE SUPABASE (Ya integrada con tus credenciales)
+        const SUPABASE_URL = 'https://cnhtbduzzcfvrdkqzrfjf.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_ZwqK_SmjJrkxPprUe07C1w_cDTfe_46';
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Inicializar Telegram Web App
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        // Obtener ID único del usuario de Telegram (o generar uno temporal si se abre en navegador web común)
+        const userId = tg.initDataUnsafe?.user?.id ? tg.initDataUnsafe.user.id.toString() : 'user_web_prueba_' + Math.floor(Math.random() * 100000);
+
+        let capituloActualId = '';
+
+        async function cargarCapitulo() {
+            try {
+                // Traer el capítulo activo actual de Supabase
+                const { data, error } = await supabaseClient
+                    .from('capitulo_activo')
+                    .select('*')
+                    .limit(1)
+                    .single();
+
+                if (error) throw error;
+
+                if (data) {
+                    capituloActualId = data.capitulo_id;
+                    document.getElementById('status').innerText = data.estado_personaje;
+                    document.getElementById('imagen').src = data.imagen_url;
+                    document.getElementById('pregunta').innerText = data.pregunta;
+                    document.getElementById('btn_a').innerText = data.opcion_a;
+                    document.getElementById('btn_b').innerText = data.opcion_b;
+
+                    // Verificar si el usuario ya votó en este capítulo
+                    verificarVotoPrevio();
+                } else {
+                    document.getElementById('pregunta').innerText = 'No hay capítulos activos en este momento.';
+                    bloquearBotones();
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('pregunta').innerText = 'Error al conectar con la base de datos.';
+            }
+        }
+
+        async function verificarVotoPrevio() {
+            const { data, error } = await supabaseClient
+                .from('votos')
+                .select('opcion')
+                .eq('capitulo_id', capituloActualId)
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (data) {
+                bloquearBotones();
+                document.getElementById('mensaje').innerText = `✅ ¡Ya registramos tu voto por la opción: ${data.opcion}!`;
+                document.getElementById('mensaje').style.color = 'green';
+            }
+        }
+
+        async function votar(opcionSeleccionada) {
+            bloquearBotones();
+            document.getElementById('mensaje').innerText = 'Enviando voto...';
+
+            const { error } = await supabaseClient
+                .from('votos')
+                .insert([
+                    { capitulo_id: capituloActualId, user_id: userId, opcion: opcionSeleccionada }
+                ]);
+
+            if (error) {
+                console.error(error);
+                if (error.code === '23505') {
+                    document.getElementById('mensaje').innerText = '⚠️ Ya habías votado anteriormente.';
+                    document.getElementById('mensaje').style.color = 'orange';
+                } else {
+                    document.getElementById('mensaje').innerText = '❌ Error al registrar el voto.';
+                    document.getElementById('mensaje').style.color = 'red';
+                }
+            } else {
+                document.getElementById('mensaje').innerText = '🎉 ¡Voto registrado con éxito!';
+                document.getElementById('mensaje').style.color = 'green';
+                
+                // Vibración háptica nativa en Telegram si está disponible
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+            }
+        }
+
+        function bloquearBotones() {
+            document.getElementById('btn_a').disabled = true;
+            document.getElementById('btn_b').disabled = true;
+        }
+
+        // Ejecutar al cargar la página
+        cargarCapitulo();
+    </script>
+</body>
+</html>
