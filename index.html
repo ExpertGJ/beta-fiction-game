@@ -35,6 +35,13 @@
             gap: 4px;
             text-align: center;
         }
+        .community-header {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
         img {
             width: 100%;
             border-radius: 12px;
@@ -65,20 +72,13 @@
             text-align: center;
         }
         .btn:disabled {
-            background-color: #cccccc;
+            background-color: #e0e0e0;
+            color: #555;
             cursor: not-allowed;
         }
         .btn-next {
             background-color: #28a745;
             display: none;
-        }
-        .results-box {
-            background: #f1f3f5;
-            padding: 12px;
-            border-radius: 10px;
-            font-size: 14px;
-            display: none;
-            text-align: center;
         }
         .blocked-card {
             background: #fff3cd;
@@ -92,9 +92,11 @@
 <body>
 
     <div class="container" id="app">
-        <!-- Panel de Estado Personal -->
+        <!-- Panel Superior: Promedios Comunitarios Globales -->
         <div class="stats-box" id="stats-panel">
-            <div>⚖️ Reputación: <span id="stat-rep">50</span>% | ⚡ Vitalidad: <span id="stat-vit">100</span>% | 🎯 Progreso: <span id="stat-prog">0</span>%</div>
+            <div class="community-header">🌍 Promedio Global de la Comunidad</div>
+            <div>⚖️ Rep.: <span id="comm-rep">50</span>% | ⚡ Vit.: <span id="comm-vit">100</span>% | 🎯 Prog.: <span id="comm-prog">0</span>%</div>
+            <div style="font-size: 11px; color: #444; margin-top: 2px;">👥 Partidas Totales: <span id="comm-total">0</span></div>
         </div>
 
         <img id="imagen" src="https://picsum.photos/400/200?random=1" alt="Escena" referrerpolicy="no-referrer">
@@ -103,9 +105,6 @@
         
         <button id="btn_a" class="btn" disabled>Opción A</button>
         <button id="btn_b" class="btn" disabled>Opción B</button>
-
-        <!-- Resultados de la comunidad tras votar -->
-        <div id="resultados-comunidad" class="results-box"></div>
 
         <!-- Botón para avanzar -->
         <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
@@ -122,23 +121,56 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        // Estado local del jugador (Escala 0 a 100)
         let jugador = {
             reputacion: 50,
             vitalidad: 100,
             progreso: 0
         };
 
-        let capituloActualId = 'cap_1'; // Empezamos en el Capítulo 1
+        let capituloActualId = 'cap_1';
 
         function ajustarEscala(actual, delta) {
             return Math.min(100, Math.max(0, actual + delta));
         }
 
-        function actualizarPanelStats() {
-            document.getElementById('stat-rep').innerText = jugador.reputacion;
-            document.getElementById('stat-vit').innerText = jugador.vitalidad;
-            document.getElementById('stat-prog').innerText = jugador.progreso;
+        async function actualizarEstadisticasComunidad() {
+            const { data: todosLosVotos, error } = await supabaseClient
+                .from('votos')
+                .select('*');
+
+            if (error || !todosLosVotos || todosLosVotos.length === 0) {
+                document.getElementById('comm-rep').innerText = 50;
+                document.getElementById('comm-vit').innerText = 100;
+                document.getElementById('comm-prog').innerText = 0;
+                document.getElementById('comm-total').innerText = 0;
+                return;
+            }
+
+            let totalPartidas = todosLosVotos.length;
+            let sumaRep = 50 * totalPartidas;
+            let sumaVit = 100 * totalPartidas;
+            let sumaProg = 0;
+
+            todosLosVotos.forEach(v => {
+                if (v.opcion === 'A') {
+                    sumaRep += 10;
+                    sumaVit -= 15;
+                    sumaProg += 15;
+                } else {
+                    sumaRep += 5;
+                    sumaVit -= 5;
+                    sumaProg += 10;
+                }
+            });
+
+            let promRep = Math.round(sumaRep / totalPartidas);
+            let promVit = Math.round(sumaVit / totalPartidas);
+            let promProg = Math.round(sumaProg / totalPartidas);
+
+            document.getElementById('comm-rep').innerText = Math.min(100, Math.max(0, promRep));
+            document.getElementById('comm-vit').innerText = Math.min(100, Math.max(0, promVit));
+            document.getElementById('comm-prog').innerText = Math.min(100, Math.max(0, promProg));
+            document.getElementById('comm-total').innerText = totalPartidas;
         }
 
         setTimeout(() => {
@@ -151,12 +183,12 @@
                     </div>
                 `;
             } else {
+                actualizarEstadisticasComunidad();
                 cargarCapitulo(capituloActualId);
             }
         }, 500);
 
         async function cargarCapitulo(idCapitulo) {
-            document.getElementById('resultados-comunidad').style.display = 'none';
             document.getElementById('btn_next').style.display = 'none';
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
 
@@ -168,10 +200,9 @@
 
             if (error || !data) {
                 document.getElementById('titulo').innerText = '🏆 Fin de la Aventura';
-                document.getElementById('pregunta').innerText = 'Has completado todos los capítulos de la historia.';
+                document.getElementById('pregunta').innerText = `Has completado la historia.\n\n📊 Tu Resultado Individual:\n⚖️ Reputación: ${jugador.reputacion}% | ⚡ Vitalidad: ${jugador.vitalidad}% | 🎯 Progreso: ${jugador.progreso}%`;
                 document.getElementById('btn_a').style.display = 'none';
                 document.getElementById('btn_b').style.display = 'none';
-                mostrarPantallaFinal();
                 return;
             }
 
@@ -188,29 +219,24 @@
             btnA.style.display = 'block';
             btnB.style.display = 'block';
 
-            btnA.onclick = () => procesarVoto('A', data.opcion_a_siguiente, data.opcion_a_rep, data.opcion_a_vit, data.opcion_a_prog);
-            btnB.onclick = () => procesarVoto('B', data.opcion_b_siguiente, data.opcion_b_rep, data.opcion_b_vit, data.opcion_b_prog);
+            btnA.onclick = () => procesarVoto('A', data.opcion_a_siguiente, data.opcion_a_rep, data.opcion_a_vit, data.opcion_a_prog, data);
+            btnB.onclick = () => procesarVoto('B', data.opcion_b_siguiente, data.opcion_b_rep, data.opcion_b_vit, data.opcion_b_prog, data);
         }
 
-        async function procesarVoto(opcionElegida, siguienteId, dRep, dVit, dProg) {
+        async function procesarVoto(opcionElegida, siguienteId, dRep, dVit, dProg, datosCap) {
             const telegramUser = tg.initDataUnsafe?.user;
             
-            // 1. Desactivar botones
             document.getElementById('btn_a').disabled = true;
             document.getElementById('btn_b').disabled = true;
 
-            // 2. Actualizar variables individuales del jugador
             jugador.reputacion = ajustarEscala(jugador.reputacion, dRep);
             jugador.vitalidad = ajustarEscala(jugador.vitalidad, dVit);
             jugador.progreso = ajustarEscala(jugador.progreso, dProg);
-            actualizarPanelStats();
 
-            // 3. Guardar voto en Supabase
             await supabaseClient.from('votos').insert([
                 { user_id: telegramUser.id.toString(), capitulo_id: capituloActualId, opcion: opcionElegida }
             ]);
 
-            // 4. Consultar estadísticas comunitarias de este capítulo
             const { data: todosVotos } = await supabaseClient
                 .from('votos')
                 .select('opcion')
@@ -222,16 +248,12 @@
             const porcA = total > 0 ? Math.round((votosA / total) * 100) : 0;
             const porcB = total > 0 ? 100 - porcA : 0;
 
-            // 5. Mostrar porcentajes en pantalla
-            const resBox = document.getElementById('resultados-comunidad');
-            resBox.innerHTML = `
-                <strong>📊 Estadísticas de la Comunidad (${total} votos totales):</strong><br>
-                Opción A: <strong>${porcA}%</strong> (${votosA} votos)<br>
-                Opción B: <strong>${porcB}%</strong> (${votosB} votos)
-            `;
-            resBox.style.display = 'block';
+            // Mostrar el porcentaje y los votos entre paréntesis directamente en los botones
+            document.getElementById('btn_a').innerHTML = `${datosCap.opcion_a_texto}<br><span style="font-size: 13px; font-weight: normal;">Opción A: ${porcA}% (${votosA} votos)</span>`;
+            document.getElementById('btn_b').innerHTML = `${datosCap.opcion_b_texto}<br><span style="font-size: 13px; font-weight: normal;">Opción B: ${porcB}% (${votosB} votos)</span>`;
 
-            // 6. Configurar y mostrar botón siguiente
+            await actualizarEstadisticasComunidad();
+
             const btnNext = document.getElementById('btn_next');
             btnNext.style.display = 'block';
             btnNext.onclick = () => {
@@ -240,13 +262,6 @@
             };
 
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        }
-
-        function mostrarPantallaFinal() {
-            document.getElementById('stats-panel').innerHTML = `
-                <h3>📊 Tu Resultado Final</h3>
-                <p>⚖️ Reputación: <strong>${jugador.reputacion}%</strong> | ⚡ Vitalidad: <strong>${jugador.vitalidad}%</strong> | 🎯 Progreso: <strong>${jugador.progreso}%</strong></p>
-            `;
         }
     </script>
 </body>
