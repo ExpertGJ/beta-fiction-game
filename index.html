@@ -180,6 +180,8 @@
 
         let historiaActualId = 'mansion_misterio';
         let capituloActualId = 'cap_1';
+        let totalCapitulosHistoria = 3; // Se actualizará dinámicamente según la historia
+        let pasoActualIndex = 0; // Para llevar la cuenta de qué barra pintar
 
         let nombresAtributos = {
             attr1: 'Atributo 1',
@@ -195,23 +197,31 @@
             attr4: 50
         };
 
-        const rutaCapitulos = ['cap_1', 'cap_2a', 'cap_3', 'fin']; 
-
         function ajustarEscala(actual, delta) {
             return Math.min(100, Math.max(0, actual + delta));
         }
 
-        function actualizarBarritasProgreso(idActual) {
-            let index = rutaCapitulos.indexOf(idActual);
-            if (index === -1) index = 0;
+        async function calcularTotalCapitulos(hId) {
+            const { data } = await supabaseClient
+                .from('capitulos')
+                .select('id')
+                .eq('historia_id', hId);
             
+            if (data) {
+                // Filtramos para contar capítulos únicos (excluyendo 'fin')
+                const unicos = [...new Set(data.map(item => item.id))];
+                totalCapitulosHistoria = unicos.length;
+            }
+        }
+
+        function actualizarBarritasProgreso() {
             const contenedor = document.getElementById('progress-bars-container');
             let htmlBarritas = '';
             
-            rutaCapitulos.forEach((_, idx) => {
-                let claseActiva = idx <= index ? 'bar active' : 'bar';
+            for (let i = 0; i < totalCapitulosHistoria; i++) {
+                let claseActiva = i <= pasoActualIndex ? 'bar active' : 'bar';
                 htmlBarritas += `<div class="${claseActiva}"></div>`;
-            });
+            }
             
             contenedor.innerHTML = htmlBarritas;
         }
@@ -283,6 +293,7 @@
                 historiaActualId = historiaActiva.historia_id;
             }
 
+            await calcularTotalCapitulos(historiaActualId);
             await cargarConfiguracionHistoria(historiaActualId);
             await actualizarEstadisticasComunidad();
             cargarCapitulo(capituloActualId);
@@ -294,7 +305,7 @@
             document.getElementById('btn_next').style.display = 'none';
             document.getElementById('otras-historias').style.display = 'none';
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
-            actualizarBarritasProgreso(idCapitulo);
+            actualizarBarritasProgreso();
 
             const { data, error } = await supabaseClient
                 .from('capitulos')
@@ -367,6 +378,7 @@
             const btnNext = document.getElementById('btn_next');
             btnNext.style.display = 'block';
             btnNext.onclick = () => {
+                pasoActualIndex++; // Avanza el indicador de la barrita verde
                 capituloActualId = siguienteId;
                 cargarCapitulo(siguienteId);
             };
@@ -389,11 +401,14 @@
                     const card = document.createElement('div');
                     card.className = 'story-card';
                     card.innerText = h.titulo_historia;
-                    card.onclick = () => {
+                    card.onclick = async () => {
                         historiaActualId = h.historia_id;
                         capituloActualId = 'cap_1';
+                        pasoActualIndex = 0; // Reiniciar contador de barritas
                         jugador = { attr1: 50, attr2: 50, attr3: 50, attr4: 50 };
                         document.getElementById('progress-bars-container').style.display = 'flex';
+                        
+                        await calcularTotalCapitulos(historiaActualId);
                         cargarConfiguracionHistoria(historiaActualId);
                         cargarCapitulo(capituloActualId);
                     };
