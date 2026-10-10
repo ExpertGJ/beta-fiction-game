@@ -100,7 +100,6 @@
 
         async function cargarCapitulo() {
             try {
-                // Validación de conectividad previa
                 const { data, error } = await supabaseClient
                     .from('capitulo_activo')
                     .select('*')
@@ -124,7 +123,7 @@
                 }
             } catch (err) {
                 console.error("Detalle del error:", err);
-                document.getElementById('pregunta').innerText = 'Error de conexión con Supabase. Revisa si usas bloqueadores (Brave Shields) o extensiones.';
+                document.getElementById('pregunta').innerText = 'Error al conectar con Supabase: ' + err.message;
             }
         }
 
@@ -165,7 +164,7 @@
                 }
             } else {
                 document.getElementById('mensaje').innerText = '🎉 ¡Voto registrado con éxito!';
-                document.getElementById('mensaje$.style.color = 'green';
+                document.getElementById('mensaje').style.color = 'green';
                 if (tg.HapticFeedback) {
                     tg.HapticFeedback.notificationOccurred('success');
                 }
