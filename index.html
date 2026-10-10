@@ -102,6 +102,28 @@
             background-color: #28a745;
             display: none;
         }
+        .stories-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            display: none;
+            margin-top: 10px;
+        }
+        .story-card {
+            background: #ffffff;
+            border: 1px solid #ced4da;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #2481cc;
+        }
+        .story-card:hover {
+            background: #e9ecef;
+        }
         .blocked-card {
             background: #fff3cd;
             color: #856404;
@@ -114,7 +136,7 @@
 <body>
 
     <div class="container" id="app">
-        <!-- Panel Superior: Promedios Comunitarios Globales con 4 Atributos Dinámicos -->
+        <!-- Panel Superior: Promedios Comunitarios Globales -->
         <div class="stats-box" id="stats-panel">
             <div class="community-header">🌍 Promedio Global de la Comunidad</div>
             <div class="stats-grid">
@@ -137,6 +159,12 @@
         <button id="btn_b" class="btn" disabled>Opción B</button>
 
         <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
+
+        <!-- Selector de otras historias al terminar -->
+        <div id="otras-historias" class="stories-box">
+            <h3>📖 Otras Historias Disponibles</h3>
+            <div id="lista-historias"></div>
+        </div>
     </div>
 
     <script>
@@ -149,6 +177,9 @@
 
         const tg = window.Telegram.WebApp;
         tg.expand();
+
+        let historiaActualId = 'mansion_misterio';
+        let capituloActualId = 'cap_1';
 
         let nombresAtributos = {
             attr1: 'Atributo 1',
@@ -164,8 +195,7 @@
             attr4: 50
         };
 
-        let capituloActualId = 'cap_1';
-        const rutaCapitulos = ['cap_1', 'cap_2a', 'cap_3', 'fin']; 
+        const rutaCapitulos = ['cap_1', 'cap_2a', 'fin']; 
 
         function ajustarEscala(actual, delta) {
             return Math.min(100, Math.max(0, actual + delta));
@@ -186,11 +216,11 @@
             contenedor.innerHTML = htmlBarritas;
         }
 
-        async function cargarConfiguracionHistoria() {
+        async function cargarConfiguracionHistoria(hId) {
             const { data } = await supabaseClient
                 .from('config_historia')
                 .select('*')
-                .eq('id', 'actual')
+                .eq('historia_id', hId)
                 .maybeSingle();
 
             if (data) {
@@ -207,13 +237,11 @@
         }
 
         async function actualizarEstadisticasComunidad() {
-            const { data: todosLosVotos, error } = await supabaseClient
+            const { data: todosLosVotos } = await supabaseClient
                 .from('votos')
                 .select('*');
 
-            if (error || !todosLosVotos || todosLosVotos.length === 0) {
-                return;
-            }
+            if (!todosLosVotos || todosLosVotos.length === 0) return;
 
             let totalPartidas = todosLosVotos.length;
             let a1 = 50 * totalPartidas, a2 = 50 * totalPartidas, a3 = 50 * totalPartidas, a4 = 50 * totalPartidas;
@@ -232,7 +260,7 @@
             document.getElementById('comm-attr4').innerText = Math.min(100, Math.max(0, Math.round(a4 / totalPartidas)));
         }
 
-        setTimeout(async () => {
+        async function iniciarApp() {
             const telegramUser = tg.initDataUnsafe?.user;
             if (!telegramUser || !telegramUser.id) {
                 document.getElementById('app').innerHTML = `
@@ -241,25 +269,42 @@
                         <p>Abre esta Mini App directamente desde Telegram para jugar.</p>
                     </div>
                 `;
-            } else {
-                await cargarConfiguracionHistoria();
-                actualizarEstadisticasComunidad();
-                cargarCapitulo(capituloActualId);
+                return;
             }
-        }, 500);
+
+            // Cargar la última historia activa por defecto
+            const { data: historiaActiva } = await supabaseClient
+                .from('config_historia')
+                .select('*')
+                .eq('activa', true)
+                .limit(1)
+                .maybeSingle();
+
+            if (historiaActiva) {
+                historiaActualId = historiaActiva.historia_id;
+            }
+
+            await cargarConfiguracionHistoria(historiaActualId);
+            await actualizarEstadisticasComunidad();
+            cargarCapitulo(capituloActualId);
+        }
+
+        setTimeout(iniciarApp, 500);
 
         async function cargarCapitulo(idCapitulo) {
             document.getElementById('btn_next').style.display = 'none';
+            document.getElementById('otras-historias').style.display = 'none';
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
             actualizarBarritasProgreso(idCapitulo);
 
             const { data, error } = await supabaseClient
                 .from('capitulos')
                 .select('*')
+                .eq('historia_id', historiaActualId)
                 .eq('id', idCapitulo)
                 .maybeSingle();
 
-            if (error || !data) {
+            if (error || !data || idCapitulo === 'fin') {
                 document.getElementById('titulo').innerText = '🏆 Fin de la Aventura';
                 document.getElementById('pregunta').innerText = `Has completado la historia.\n\n📊 Tu Resultado Individual:\n` +
                     `${nombresAtributos.attr1}: ${jugador.attr1}% | ${nombresAtributos.attr2}: ${jugador.attr2}%\n` +
@@ -267,6 +312,9 @@
                 document.getElementById('btn_a').style.display = 'none';
                 document.getElementById('btn_b').style.display = 'none';
                 document.getElementById('progress-bars-container').style.display = 'none';
+                
+                // Mostrar otras historias disponibles al terminar
+                mostrarOtrasHistorias();
                 return;
             }
 
@@ -327,4 +375,36 @@
 
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         }
+
+        async function mostrarOtrasHistorias() {
+            const { data: lista } = await supabaseClient
+                .from('config_historia')
+                .select('*');
+
+            if (!lista || lista.length <= 1) return; // Si solo hay una historia, no muestra el selector
+
+            const contenedorLista = document.getElementById('lista-historias');
+            contenedorLista.innerHTML = '';
+
+            lista.forEach(h => {
+                if (h.historia_id !== historiaActualId) {
+                    const card = document.createElement('div');
+                    card.className = 'story-card';
+                    card.innerText = h.titulo_historia;
+                    card.onclick = () => {
+                        historiaActualId = h.historia_id;
+                        capituloActualId = 'cap_1';
+                        jugador = { attr1: 50, attr2: 50, attr3: 50, attr4: 50 };
+                        document.getElementById('progress-bars-container').style.display = 'flex';
+                        cargarConfiguracionHistoria(historiaActualId);
+                        cargarCapitulo(capituloActualId);
+                    };
+                    contenedorLista.appendChild(card);
+                }
+            });
+
+            document.getElementById('otras-historias').style.display = 'block';
+        }
     </script>
+</body>
+</html>
