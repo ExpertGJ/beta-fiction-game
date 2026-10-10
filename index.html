@@ -195,7 +195,7 @@
             attr4: 50
         };
 
-        const rutaCapitulos = ['cap_1', 'cap_2a', 'fin']; 
+        const rutaCapitulos = ['cap_1', 'cap_2a', 'cap_3', 'fin']; 
 
         function ajustarEscala(actual, delta) {
             return Math.min(100, Math.max(0, actual + delta));
@@ -272,7 +272,6 @@
                 return;
             }
 
-            // Cargar la última historia activa por defecto
             const { data: historiaActiva } = await supabaseClient
                 .from('config_historia')
                 .select('*')
@@ -313,7 +312,6 @@
                 document.getElementById('btn_b').style.display = 'none';
                 document.getElementById('progress-bars-container').style.display = 'none';
                 
-                // Mostrar otras historias disponibles al terminar
                 mostrarOtrasHistorias();
                 return;
             }
@@ -381,7 +379,7 @@
                 .from('config_historia')
                 .select('*');
 
-            if (!lista || lista.length <= 1) return; // Si solo hay una historia, no muestra el selector
+            if (!lista || lista.length <= 1) return;
 
             const contenedorLista = document.getElementById('lista-historias');
             contenedorLista.innerHTML = '';
