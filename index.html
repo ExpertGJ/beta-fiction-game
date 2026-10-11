@@ -398,9 +398,9 @@
                     
                     <div class="donation-box">
                         <div class="donation-text">
-                            Mantener este espacio vivo requiere tiempo y recursos. Si disfrutaste nuestra historia, apóyanos ahora mismo enviando un regalo en nuestro canal.
+                            Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo en nuestro canal.
                         </div>
-                        <button class="btn-channel" onclick="abrirCanalRegalos()">🎁 Enviar Regalo en el Canal</button>
+                        <button class="btn-channel" onclick="abrirCanalRegalos()">Enviar Regalo</button>
                     </div>
                 `;
                 
@@ -437,12 +437,11 @@
             }
         }
 
-        // Función para abrir el canal de Telegram nativamente de forma segura
+        // Función configurada con el link exacto del canal BookBetaReader
         function abrirCanalRegalos() {
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             
-            // Reemplaza 'https://t.me/tu_canal' con el link real de tu canal o de una publicación específica
-            const urlCanal = 'https://t.me/tu_canal';
+            const urlCanal = 'https://t.me/BookBetaReader';
 
             if (tg && typeof tg.openLink === 'function') {
                 tg.openLink(urlCanal);
