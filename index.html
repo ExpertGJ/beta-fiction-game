@@ -404,9 +404,30 @@
                 // Ocultar el título de capítulo al finalizar la historia
                 document.getElementById('titulo').style.display = 'none';
 
+                // Consultar epílogos desde Supabase y buscar el que cumpla con los porcentajes del jugador
+                const { data: listaEpilogos } = await supabaseClient
+                    .from('epilogos')
+                    .select('*')
+                    .eq('historia_id', historiaActualId);
+
+                let epilogoEncontrado = null;
+                if (listaEpilogos && listaEpilogos.length > 0) {
+                    epilogoEncontrado = listaEpilogos.find(ep => {
+                        const c1 = (ep.min_attr1 === null || jugador.attr1 >= ep.min_attr1) && (ep.max_attr1 === null || jugador.attr1 <= ep.max_attr1);
+                        const c2 = (ep.min_attr2 === null || jugador.attr2 >= ep.min_attr2) && (ep.max_attr2 === null || jugador.attr2 <= ep.max_attr2);
+                        const c3 = (ep.min_attr3 === null || jugador.attr3 >= ep.min_attr3) && (ep.max_attr3 === null || jugador.attr3 <= ep.max_attr3);
+                        const c4 = (ep.min_attr4 === null || jugador.attr4 >= ep.min_attr4) && (ep.max_attr4 === null || jugador.attr4 <= ep.max_attr4);
+                        return c1 && c2 && c3 && c4;
+                    });
+                }
+
+                const tituloFinal = epilogoEncontrado ? epilogoEncontrado.titulo_conclusion : 'EPÍLOGO Y CONCLUSIÓN';
+                const textoFinal = epilogoEncontrado ? epilogoEncontrado.texto_epilogo : 'Has completado la historia.';
+
                 document.getElementById('pregunta').innerHTML = `
-                    <strong>EPÍLOGO Y CONCLUSIÓN</strong><br><br>
-                    Has completado la historia.<br><br>
+                    <strong>${tituloFinal}</strong><br><br>
+                    <p style="text-align: justify; font-size: 14px; line-height: 1.5;">${textoFinal}</p><br>
+                    
                     <strong>📊 Tu Resultado Individual:</strong><br>
                     ${nombresAtributos.attr1}: ${jugador.attr1}% | ${nombresAtributos.attr2}: ${jugador.attr2}%<br>
                     ${nombresAtributos.attr3}: ${jugador.attr3}% | ${nombresAtributos.attr4}: ${jugador.attr4}%
