@@ -437,15 +437,17 @@
             }
         }
 
-        // Función para procesar donaciones con estrellas
+        // Función para procesar donaciones con estrellas mediante la API nativa de Telegram
         function donarEstrellas(cantidad = 50) {
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             
-            if (tg.openInvoice) {
-                // Aquí conectarías con el enlace de factura generado por tu backend del bot
-                // tg.openInvoice(invoiceLink, (status) => { ... });
+            if (typeof tg.openInvoice === 'function') {
+                // Aquí se integrará el enlace de factura (invoiceLink) generado por tu bot/servidor
+                // Ejemplo: tg.openInvoice(invoiceLink, (status) => { if (status === 'paid') { ... } });
+                alert('Abriendo pasarela de pago nativa de Telegram...');
             } else {
-                alert(`¡Gracias por tu intención de donar ${cantidad} 🌟 Estrellas!`);
+                // Modo fallback si se prueba fuera del entorno de Telegram
+                alert(`¡Gracias por tu intención de enviar ${cantidad} 🌟 Estrellas!`);
             }
         }
 
