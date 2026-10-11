@@ -176,7 +176,7 @@
         <!-- Panel Superior: Título/Autor y Promedios Comunitarios -->
         <div class="stats-box" id="stats-panel">
             <div id="story-title-author" class="story-author-header">Cargando historia...</div>
-            <div class="community-header">🌍 Promedio Global de la Comunidad</div>
+            <div class="community-header">Promedio Global de la Comunidad</div>
             <div class="stats-grid">
                 <div><span id="lbl-attr1">Attr 1</span>: <span id="comm-attr1">50</span>%</div>
                 <div><span id="lbl-attr2">Attr 2</span>: <span id="comm-attr2">50</span>%</div>
@@ -290,9 +290,9 @@
                 document.getElementById('lbl-attr3').innerText = data.attr_3_nombre;
                 document.getElementById('lbl-attr4').innerText = data.attr_4_nombre;
 
-                // Mostrar el Título y Autor en el panel superior (Ej: "Título - G. J. Santos")
+                // Mostrar el Título y Autor en el panel superior (Ej: "Título — G. J. Santos")
                 const autor = data.autor || 'G. J. Santos';
-                document.getElementById('story-title-author').innerText = `${data.titulo_historia} - ${autor}`;
+                document.getElementById('story-title-author').innerText = `${data.titulo_historia} — ${autor}`;
             }
         }
 
@@ -404,9 +404,9 @@
                     
                     <div class="donation-box">
                         <div class="donation-text">
-                            Mantener este espacio vivo requiere tiempo y recursos. Si disfrutaste nuestra historia, apóyanos ahora mismo enviando un regalo en nuestro canal.
+                            Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
                         </div>
-                        <button class="btn-channel" onclick="abrirCanalRegalos()">🎁 Enviar Regalo</button>
+                        <button class="btn-channel" onclick="abrirCanalRegalos()">Enviar Regalo</button>
                     </div>
                 `;
                 
