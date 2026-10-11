@@ -77,6 +77,12 @@
         .bar.active {
             background-color: #28a745;
         }
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 2px;
+        }
         .question {
             font-size: 15px;
             line-height: 1.4;
@@ -191,7 +197,9 @@
         <!-- Barritas de Progreso Dinámicas -->
         <div class="progress-bars" id="progress-bars-container"></div>
 
-        <!-- Sin título de capítulo: directo a la descripción -->
+        <!-- Título condicional del capítulo/sección -->
+        <div id="titulo" class="title" style="display: none;"></div>
+        <!-- Descripción de la escena -->
         <div id="pregunta" class="question">Por favor, espera...</div>
         
         <!-- Contenedor dinámico de opciones -->
@@ -290,7 +298,6 @@
                 document.getElementById('lbl-attr3').innerText = data.attr_3_nombre;
                 document.getElementById('lbl-attr4').innerText = data.attr_4_nombre;
 
-                // Mostrar el Título y Autor en el panel superior (Ej: "Título – G.J. Santos")
                 const autor = data.autor || 'G.J. Santos';
                 document.getElementById('story-title-author').innerText = `${data.titulo_historia} – ${autor}`;
             }
@@ -394,7 +401,9 @@
                 await registrarPuntajeFinalComunidad();
                 await actualizarEstadisticasComunidad();
 
-                // Pantalla final sin usar elementos de título de capítulo
+                // Ocultar el título de capítulo al finalizar la historia
+                document.getElementById('titulo').style.display = 'none';
+
                 document.getElementById('pregunta').innerHTML = `
                     <strong>🏆 Fin de la Aventura</strong><br><br>
                     Has completado la historia.<br><br>
@@ -417,7 +426,17 @@
                 return;
             }
 
-            // Mostrar solamente la descripción (se eliminó la manipulación del elemento 'titulo')
+            // Validar si la celda del título de la sección/capítulo tiene contenido en Supabase
+            const elementoTitulo = document.getElementById('titulo');
+            if (capituloData.titulo && capituloData.titulo.trim() !== '') {
+                elementoTitulo.innerText = capituloData.titulo;
+                elementoTitulo.style.display = 'block';
+            } else {
+                elementoTitulo.innerText = '';
+                elementoTitulo.style.display = 'none';
+            }
+
+            // Mostrar la descripción de la escena
             document.getElementById('pregunta').innerText = capituloData.descripcion;
 
             const { data: opcionesList } = await supabaseClient
