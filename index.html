@@ -66,7 +66,7 @@
             height: 4px;
             border-radius: 2px;
             background-color: #e0e0e0;
-            transition: background-color 0.3s;
+            transition: background-color 0.4s ease;
         }
         .bar.active {
             background-color: #28a745;
@@ -180,8 +180,8 @@
 
         let historiaActualId = 'mansion_misterio';
         let capituloActualId = 'cap_1';
-        let totalCapitulosHistoria = 3; // Se actualizará dinámicamente según la historia
-        let pasoActualIndex = 0; // Para llevar la cuenta de qué barra pintar
+        let totalPasosHistoria = 3; // Se carga desde config_historia
+        let pasoActualIndex = 0; 
 
         let nombresAtributos = {
             attr1: 'Atributo 1',
@@ -201,24 +201,22 @@
             return Math.min(100, Math.max(0, actual + delta));
         }
 
-        async function calcularTotalCapitulos(hId) {
-            const { data } = await supabaseClient
-                .from('capitulos')
-                .select('id')
-                .eq('historia_id', hId);
-            
-            if (data) {
-                // Filtramos para contar capítulos únicos (excluyendo 'fin')
-                const unicos = [...new Set(data.map(item => item.id))];
-                totalCapitulosHistoria = unicos.length;
+        // Función inteligente: Lee el ID del capítulo (ej: 'cap_2a', 'cap_3', 'fin') y determina cuántas barras iluminar
+        function obtenerIndicePorIdCapitulo(idCap) {
+            if (idCap === 'fin') return totalPasosHistoria - 1;
+            const match = idCap.match(/\d+/);
+            if (match) {
+                const num = parseInt(match[0], 10);
+                return Math.min(totalPasosHistoria - 1, Math.max(0, num - 1));
             }
+            return pasoActualIndex;
         }
 
         function actualizarBarritasProgreso() {
             const contenedor = document.getElementById('progress-bars-container');
             let htmlBarritas = '';
             
-            for (let i = 0; i < totalCapitulosHistoria; i++) {
+            for (let i = 0; i < totalPasosHistoria; i++) {
                 let claseActiva = i <= pasoActualIndex ? 'bar active' : 'bar';
                 htmlBarritas += `<div class="${claseActiva}"></div>`;
             }
@@ -238,6 +236,7 @@
                 nombresAtributos.attr2 = data.attr_2_nombre;
                 nombresAtributos.attr3 = data.attr_3_nombre;
                 nombresAtributos.attr4 = data.attr_4_nombre;
+                totalPasosHistoria = data.total_pasos || 3;
 
                 document.getElementById('lbl-attr1').innerText = data.attr_1_nombre;
                 document.getElementById('lbl-attr2').innerText = data.attr_2_nombre;
@@ -293,7 +292,7 @@
                 historiaActualId = historiaActiva.historia_id;
             }
 
-            await calcularTotalCapitulos(historiaActualId);
+            pasoActualIndex = 0;
             await cargarConfiguracionHistoria(historiaActualId);
             await actualizarEstadisticasComunidad();
             cargarCapitulo(capituloActualId);
@@ -315,6 +314,9 @@
                 .maybeSingle();
 
             if (error || !data || idCapitulo === 'fin') {
+                pasoActualIndex = totalPasosHistoria - 1;
+                actualizarBarritasProgreso();
+
                 document.getElementById('titulo').innerText = '🏆 Fin de la Aventura';
                 document.getElementById('pregunta').innerText = `Has completado la historia.\n\n📊 Tu Resultado Individual:\n` +
                     `${nombresAtributos.attr1}: ${jugador.attr1}% | ${nombresAtributos.attr2}: ${jugador.attr2}%\n` +
@@ -375,10 +377,13 @@
 
             await actualizarEstadisticasComunidad();
 
+            // Actualizamos las barritas basándonos en el ID del capítulo de destino
+            pasoActualIndex = obtenerIndicePorIdCapitulo(siguienteId);
+            actualizarBarritasProgreso();
+
             const btnNext = document.getElementById('btn_next');
             btnNext.style.display = 'block';
             btnNext.onclick = () => {
-                pasoActualIndex++; // Avanza el indicador de la barrita verde
                 capituloActualId = siguienteId;
                 cargarCapitulo(siguienteId);
             };
@@ -404,12 +409,11 @@
                     card.onclick = async () => {
                         historiaActualId = h.historia_id;
                         capituloActualId = 'cap_1';
-                        pasoActualIndex = 0; // Reiniciar contador de barritas
+                        pasoActualIndex = 0; 
                         jugador = { attr1: 50, attr2: 50, attr3: 50, attr4: 50 };
                         document.getElementById('progress-bars-container').style.display = 'flex';
                         
-                        await calcularTotalCapitulos(historiaActualId);
-                        cargarConfiguracionHistoria(historiaActualId);
+                        await cargarConfiguracionHistoria(historiaActualId);
                         cargarCapitulo(capituloActualId);
                     };
                     contenedorLista.appendChild(card);
