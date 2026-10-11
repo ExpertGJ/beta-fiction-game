@@ -137,6 +137,37 @@
             border-radius: 12px;
             text-align: center;
         }
+        /* Estilos de la tarjeta de donación */
+        .donation-box {
+            background: #fff9e6;
+            border: 1px solid #ffe0b2;
+            padding: 14px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .donation-text {
+            font-size: 13px;
+            font-style: italic;
+            color: #5c3c10;
+            line-height: 1.4;
+            padding: 0 8px;
+        }
+        .btn-star {
+            background-color: #ffb300;
+            color: #ffffff;
+            border: none;
+            padding: 11px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(255, 179, 0, 0.35);
+        }
     </style>
 </head>
 <body>
@@ -153,7 +184,7 @@
             </div>
         </div>
 
-        <!-- Se quitó el src fijo para que no parpadee al arrancar -->
+        <!-- Imagen de la escena -->
         <img id="imagen" alt="Escena" referrerpolicy="no-referrer">
         
         <!-- Barritas de Progreso Dinámicas -->
@@ -341,7 +372,6 @@
             document.getElementById('btn_next').style.display = 'none';
             document.getElementById('otras-historias').style.display = 'none';
             
-            // La imagen solo se asigna al entrar al capítulo de forma limpia
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
             actualizarBarritasProgreso();
 
@@ -360,9 +390,20 @@
                 await actualizarEstadisticasComunidad();
 
                 document.getElementById('titulo').innerText = '🏆 Fin de la Aventura';
-                document.getElementById('pregunta').innerText = `Has completado la historia.\n\n📊 Tu Resultado Individual:\n` +
-                    `${nombresAtributos.attr1}: ${jugador.attr1}% | ${nombresAtributos.attr2}: ${jugador.attr2}%\n` +
-                    `${nombresAtributos.attr3}: ${jugador.attr3}% | ${nombresAtributos.attr4}: ${jugador.attr4}%`;
+                document.getElementById('pregunta').innerHTML = `
+                    Has completado la historia.<br><br>
+                    <strong>📊 Tu Resultado Individual:</strong><br>
+                    ${nombresAtributos.attr1}: ${jugador.attr1}% | ${nombresAtributos.attr2}: ${jugador.attr2}%<br>
+                    ${nombresAtributos.attr3}: ${jugador.attr3}% | ${nombresAtributos.attr4}: ${jugador.attr4}%
+                    
+                    <div class="donation-box">
+                        <div class="donation-text">
+                            ¿Disfrutaste esta historia? Tu aporte nos ayuda a cubrir los costos para mantener vivo este proyecto y seguir creando nuevas aventuras para ti.
+                        </div>
+                        <button class="btn-star" onclick="donarEstrellas(50)">🌟 Apóyanos ahora</button>
+                    </div>
+                `;
+                
                 document.getElementById('opciones-container').innerHTML = '';
                 document.getElementById('progress-bars-container').style.display = 'none';
                 
@@ -393,6 +434,18 @@
                     btn.onclick = () => procesarSeleccionOpcion(opcion, opcionesList);
                     contenedorOpciones.appendChild(btn);
                 });
+            }
+        }
+
+        // Función para procesar donaciones con estrellas
+        function donarEstrellas(cantidad = 50) {
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            
+            if (tg.openInvoice) {
+                // Aquí conectarías con el enlace de factura generado por tu backend del bot
+                // tg.openInvoice(invoiceLink, (status) => { ... });
+            } else {
+                alert(`¡Gracias por tu intención de donar ${cantidad} 🌟 Estrellas!`);
             }
         }
 
