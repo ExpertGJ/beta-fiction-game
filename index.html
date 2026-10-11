@@ -180,7 +180,7 @@
 
         let historiaActualId = 'mansion_misterio';
         let capituloActualId = 'cap_1';
-        let totalPasosHistoria = 3; // Se carga desde config_historia
+        let totalPasosHistoria = 3; 
         let pasoActualIndex = 0; 
 
         let nombresAtributos = {
@@ -377,13 +377,12 @@
 
             await actualizarEstadisticasComunidad();
 
-            // Actualizamos las barritas basándonos en el ID del capítulo de destino
-            pasoActualIndex = obtenerIndicePorIdCapitulo(siguienteId);
-            actualizarBarritasProgreso();
-
+            // Las barritas NO se actualizan aquí al votar, se quedan quietas.
             const btnNext = document.getElementById('btn_next');
             btnNext.style.display = 'block';
             btnNext.onclick = () => {
+                // Las barritas se actualizan y avanzan únicamente al presionar "Siguiente Capítulo"
+                pasoActualIndex = obtenerIndicePorIdCapitulo(siguienteId);
                 capituloActualId = siguienteId;
                 cargarCapitulo(siguienteId);
             };
