@@ -66,7 +66,7 @@
             height: 4px;
             border-radius: 2px;
             background-color: #e0e0e0;
-            transition: background-color 0.3s;
+            transition: background-color 0.4s ease;
         }
         .bar.active {
             background-color: #28a745;
@@ -181,7 +181,7 @@
         let historiaActualId = 'mansion_misterio';
         let capituloActualId = 'cap_1';
         let totalPasosHistoria = 3; 
-        let pasoActualIndex = 0; // 0 significa la primera barra activa
+        let pasoActualIndex = 0; 
 
         let nombresAtributos = {
             attr1: 'Atributo 1',
@@ -303,7 +303,7 @@
                 .maybeSingle();
 
             if (error || !data || idCapitulo === 'fin') {
-                // Si llega al final, llenamos todas las barritas visualmente
+                // Aseguramos que todas las barritas estén llenas al llegar al fin
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
 
@@ -367,16 +367,19 @@
 
             await actualizarEstadisticasComunidad();
 
+            // Lógica inteligente de llenado de barras ante saltos:
+            if (siguienteId === 'fin') {
+                // Si el salto va directo al final, llenamos todas las barras de golpe antes de continuar
+                pasoActualIndex = totalPasosHistoria - 1;
+            } else {
+                // Si avanza normalmente al siguiente capítulo, incrementa un paso
+                pasoActualIndex = Math.min(totalPasosHistoria - 1, pasoActualIndex + 1);
+            }
+            actualizarBarritasProgreso(); // Se actualizan visualmente de inmediato
+
             const btnNext = document.getElementById('btn_next');
             btnNext.style.display = 'block';
             btnNext.onclick = () => {
-                // Si el siguiente paso es el fin o un salto directo, incrementamos inteligentemente el índice para que se llenen las barras acorde al avance
-                if (siguienteId === 'fin') {
-                    pasoActualIndex = totalPasosHistoria - 1;
-                } else {
-                    pasoActualIndex = Math.min(totalPasosHistoria - 1, pasoActualIndex + 1);
-                }
-                
                 capituloActualId = siguienteId;
                 cargarCapitulo(siguienteId);
             };
