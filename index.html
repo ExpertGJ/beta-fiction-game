@@ -258,7 +258,7 @@
         }
 
         function obtenerIndicePorIdCapitulo(idCap) {
-            if (idCap === 'fin') return totalPasosHistoria - 1;
+            if (idCap === 'fin' || idCap.includes('epilogo')) return totalPasosHistoria - 1;
             const match = idCap.match(/\d+/);
             if (match) {
                 const num = parseInt(match[0], 10);
@@ -298,7 +298,6 @@
                 document.getElementById('lbl-attr3').innerText = data.attr_3_nombre;
                 document.getElementById('lbl-attr4').innerText = data.attr_4_nombre;
 
-                // Modificado para mostrar únicamente el título de la historia sin el autor
                 document.getElementById('story-title-author').innerText = data.titulo_historia;
             }
         }
@@ -394,35 +393,25 @@
                 .eq('id', idCapitulo)
                 .maybeSingle();
 
-            if (error || !capituloData || idCapitulo === 'fin') {
+            // Consultar si este capítulo tiene opciones asociadas
+            const { data: opcionesList } = await supabaseClient
+                .from('opciones')
+                .select('*')
+                .eq('historia_id', historiaActualId)
+                .eq('capitulo_id', idCapitulo);
+
+            // Si es un capítulo final (sin opciones, con error o con ID 'fin')
+            if (error || !capituloData || idCapitulo === 'fin' || !opcionesList || opcionesList.length === 0) {
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
 
                 await registrarPuntajeFinalComunidad();
                 await actualizarEstadisticasComunidad();
 
-                // Ocultar el título de capítulo al finalizar la historia
                 document.getElementById('titulo').style.display = 'none';
 
-                // Consultar epílogos desde Supabase y buscar el que cumpla con los porcentajes del jugador
-                const { data: listaEpilogos } = await supabaseClient
-                    .from('epilogos')
-                    .select('*')
-                    .eq('historia_id', historiaActualId);
-
-                let epilogoEncontrado = null;
-                if (listaEpilogos && listaEpilogos.length > 0) {
-                    epilogoEncontrado = listaEpilogos.find(ep => {
-                        const c1 = (ep.min_attr1 === null || jugador.attr1 >= ep.min_attr1) && (ep.max_attr1 === null || jugador.attr1 <= ep.max_attr1);
-                        const c2 = (ep.min_attr2 === null || jugador.attr2 >= ep.min_attr2) && (ep.max_attr2 === null || jugador.attr2 <= ep.max_attr2);
-                        const c3 = (ep.min_attr3 === null || jugador.attr3 >= ep.min_attr3) && (ep.max_attr3 === null || jugador.attr3 <= ep.max_attr3);
-                        const c4 = (ep.min_attr4 === null || jugador.attr4 >= ep.min_attr4) && (ep.max_attr4 === null || jugador.attr4 <= ep.max_attr4);
-                        return c1 && c2 && c3 && c4;
-                    });
-                }
-
-                let tituloFinal = epilogoEncontrado ? epilogoEncontrado.titulo_conclusion : 'EPÍLOGO Y CONCLUSIÓN';
-                let textoFinal = epilogoEncontrado ? epilogoEncontrado.texto_epilogo : 'Has completado la historia.';
+                let tituloFinal = (capituloData && capituloData.titulo) ? capituloData.titulo : 'EPÍLOGO Y CONCLUSIÓN';
+                let textoFinal = (capituloData && capituloData.descripcion) ? capituloData.descripcion : 'Has completado la historia.';
 
                 // Reemplazo dinámico de los cuatro atributos ({attrX_nombre} y {attrX_val})
                 textoFinal = textoFinal
@@ -464,7 +453,7 @@
                 return;
             }
 
-            // Validar si la celda del título de la sección/capítulo tiene contenido en Supabase
+            // Validar si la celda del título de la sección/capítulo tiene contenido
             const elementoTitulo = document.getElementById('titulo');
             if (capituloData.titulo && capituloData.titulo.trim() !== '') {
                 elementoTitulo.innerText = capituloData.titulo;
@@ -477,27 +466,19 @@
             // Mostrar la descripción de la escena
             document.getElementById('pregunta').innerText = capituloData.descripcion;
 
-            const { data: opcionesList } = await supabaseClient
-                .from('opciones')
-                .select('*')
-                .eq('historia_id', historiaActualId)
-                .eq('capitulo_id', idCapitulo);
-
             const contenedorOpciones = document.getElementById('opciones-container');
             contenedorOpciones.innerHTML = '';
 
-            if (opcionesList && opcionesList.length > 0) {
-                const opcionesAleatorias = barajarArreglo(opcionesList);
+            const opcionesAleatorias = barajarArreglo(opcionesList);
 
-                opcionesAleatorias.forEach((opcion) => {
-                    const btn = document.createElement('button');
-                    btn.className = 'btn';
-                    btn.dataset.opcionId = opcion.id; 
-                    btn.innerText = opcion.texto_opcion;
-                    btn.onclick = () => procesarSeleccionOpcion(opcion, opcionesList);
-                    contenedorOpciones.appendChild(btn);
-                });
-            }
+            opcionesAleatorias.forEach((opcion) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.dataset.opcionId = opcion.id; 
+                btn.innerText = opcion.texto_opcion;
+                btn.onclick = () => procesarSeleccionOpcion(opcion, opcionesList);
+                contenedorOpciones.appendChild(btn);
+            });
         }
 
         function abrirCanalRegalos() {
