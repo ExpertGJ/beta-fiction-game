@@ -161,7 +161,7 @@
         <div id="titulo" class="title">Cargando...</div>
         <div id="pregunta" class="question">Por favor, espera...</div>
         
-        <!-- Contenedor dinámico limpio (sin huecos vacíos) -->
+        <!-- Contenedor dinámico de opciones -->
         <div id="opciones-container" class="options-container"></div>
 
         <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
@@ -332,7 +332,7 @@
             document.getElementById('titulo').innerText = capituloData.titulo;
             document.getElementById('pregunta').innerText = capituloData.descripcion;
 
-            // Carga dinámica de las opciones de este capítulo exacto (crea solo los botones necesarios)
+            // Cargar dinámicamente las opciones del capítulo
             const { data: opcionesList } = await supabaseClient
                 .from('opciones')
                 .select('*')
@@ -346,16 +346,18 @@
                 opcionesList.forEach((opcion) => {
                     const btn = document.createElement('button');
                     btn.className = 'btn';
+                    btn.dataset.opcionId = opcion.id; // Guardamos el ID para identificarlo al votar
                     btn.innerText = opcion.texto_opcion;
-                    btn.onclick = () => procesarSeleccionOpcion(opcion);
+                    btn.onclick = () => procesarSeleccionOpcion(opcion, opcionesList);
                     contenedorOpciones.appendChild(btn);
                 });
             }
         }
 
-        async function procesarSeleccionOpcion(opcionElegida) {
+        async function procesarSeleccionOpcion(opcionElegida, opcionesList) {
             const telegramUser = tg.initDataUnsafe?.user;
             
+            // Deshabilitar todos los botones de opciones
             const botones = document.querySelectorAll('#opciones-container .btn');
             botones.forEach(b => b.disabled = true);
 
@@ -364,13 +366,33 @@
             jugador.attr3 = ajustarEscala(jugador.attr3, opcionElegida.attr3_delta || 0);
             jugador.attr4 = ajustarEscala(jugador.attr4, opcionElegida.attr4_delta || 0);
 
+            // Registrar el voto en Supabase
             await supabaseClient.from('votos').insert([
                 { user_id: telegramUser.id.toString(), capitulo_id: capituloActualId, opcion: opcionElegida.id.toString() }
             ]);
 
+            // Obtener todos los votos de este capítulo para calcular porcentajes por opción
+            const { data: todosVotosCapitulo } = await supabaseClient
+                .from('votos')
+                .select('opcion')
+                .eq('capitulo_id', capituloActualId);
+
+            const totalVotos = todosVotosCapitulo ? todosVotosCapitulo.length : 0;
+
+            // Actualizar el texto de CADA botón con su respectivo porcentaje y votos
+            botones.forEach(btn => {
+                const optId = btn.dataset.opcionId;
+                const optOriginal = opcionesList.find(o => o.id.toString() === optId);
+                
+                const votosEstaOpc = todosVotosCapitulo ? todosVotosCapitulo.filter(v => v.opcion === optId).length : 0;
+                const porcentaje = totalVotos > 0 ? Math.round((votosEstaOpc / totalVotos) * 100) : 0;
+
+                btn.innerHTML = `${optOriginal.texto_opcion}<br><span style="font-size: 13px; font-weight: normal;">${porcentaje}% (${votosEstaOpc} votos)</span>`;
+            });
+
             await actualizarEstadisticasComunidad();
 
-            // Las barritas se quedan quietas al votar y solo avanzan al presionar "Siguiente"
+            // Las barritas se quedan quietas y avanzan únicamente al presionar "Siguiente Capítulo"
             const btnNext = document.getElementById('btn_next');
             btnNext.style.display = 'block';
             btnNext.onclick = () => {
