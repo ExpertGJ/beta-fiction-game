@@ -38,6 +38,7 @@
         .story-author-header {
             font-size: 14px;
             font-weight: bold;
+            font-style: italic;
             color: var(--tg-theme-text-color, #000000);
             border-bottom: 1px solid rgba(0,0,0,0.08);
             padding-bottom: 4px;
@@ -80,6 +81,7 @@
         .title {
             font-size: 18px;
             font-weight: bold;
+            font-style: italic;
             text-align: center;
             margin-bottom: 2px;
         }
@@ -319,7 +321,6 @@
                 .eq('historia_id', historiaActualId)
                 .maybeSingle();
 
-            // Si hay un error en la red o la tabla no responde, conservamos los valores previos en pantalla para evitar parpadeos en 50
             if (error || !data || !data.total_partidas || data.total_partidas <= 0) {
                 return;
             }
@@ -343,7 +344,6 @@
             let nuevo3 = (actual && actual.attr3_acum) ? actual.attr3_acum + jugador.attr3 : jugador.attr3;
             let nuevo4 = (actual && actual.attr4_acum) ? actual.attr4_acum + jugador.attr4 : jugador.attr4;
 
-            // Usamos upsert para asegurar que si el registro no existía previamente, se cree correctamente sin fallar
             await supabaseClient
                 .from('promedios_globales')
                 .upsert({
@@ -402,14 +402,12 @@
                 .eq('id', idCapitulo)
                 .maybeSingle();
 
-            // Consultar si este capítulo tiene opciones asociadas
             const { data: opcionesList } = await supabaseClient
                 .from('opciones')
                 .select('*')
                 .eq('historia_id', historiaActualId)
                 .eq('capitulo_id', idCapitulo);
 
-            // Si es un capítulo final (sin opciones, con error o con ID 'fin')
             if (error || !capituloData || idCapitulo === 'fin' || !opcionesList || opcionesList.length === 0) {
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
@@ -423,7 +421,6 @@
                 let tituloFinal = (capituloData && capituloData.titulo) ? capituloData.titulo : 'EPÍLOGO Y CONCLUSIÓN';
                 let textoFinal = (capituloData && capituloData.descripcion) ? capituloData.descripcion : 'Has completado la historia.';
 
-                // Reemplazo dinámico de los cuatro atributos ({attrX_nombre} y {attrX_val})
                 textoFinal = textoFinal
                     .replaceAll('{attr1_nombre}', nombresAtributos.attr1)
                     .replaceAll('{attr1_val}', jugador.attr1)
@@ -463,7 +460,6 @@
                 return;
             }
 
-            // Validar si la celda del título de la sección/capítulo tiene contenido
             const elementoTitulo = document.getElementById('titulo');
             if (capituloData.titulo && capituloData.titulo.trim() !== '') {
                 elementoTitulo.innerText = capituloData.titulo;
@@ -473,13 +469,11 @@
                 elementoTitulo.style.display = 'none';
             }
 
-            // Mostrar la descripción de la escena
             document.getElementById('pregunta').innerText = capituloData.descripcion;
 
             const contenedorOpciones = document.getElementById('opciones-container');
             contenedorOpciones.innerHTML = '';
 
-            // Si no hay opciones definidas en la base de datos para este capítulo intermedio
             if (!opcionesList || opcionesList.length === 0) {
                 document.getElementById('hint-siguiente').style.display = 'none';
                 const btnNext = document.getElementById('btn_next');
