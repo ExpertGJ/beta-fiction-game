@@ -179,7 +179,7 @@
 <body>
 
     <div class="container" id="app">
-        <!-- Panel Superior: Título/Autor y Promedios Comunitarios -->
+        <!-- Panel Superior: Título y Promedios Comunitarios -->
         <div class="stats-box" id="stats-panel">
             <div id="story-title-author" class="story-author-header">Cargando historia...</div>
             <div class="community-header">Promedio Global de la Comunidad</div>
@@ -298,8 +298,8 @@
                 document.getElementById('lbl-attr3').innerText = data.attr_3_nombre;
                 document.getElementById('lbl-attr4').innerText = data.attr_4_nombre;
 
-                const autor = data.autor || 'G.J. Santos';
-                document.getElementById('story-title-author').innerText = `${data.titulo_historia} – ${autor}`;
+                // Modificado para mostrar únicamente el título de la historia sin el autor
+                document.getElementById('story-title-author').innerText = data.titulo_historia;
             }
         }
 
