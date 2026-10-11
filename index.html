@@ -207,6 +207,16 @@
             return Math.min(100, Math.max(0, actual + delta));
         }
 
+        // Función para mezclar un arreglo de forma aleatoria (Fisher-Yates)
+        function barajarArreglo(array) {
+            let arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
         function obtenerIndicePorIdCapitulo(idCap) {
             if (idCap === 'fin') return totalPasosHistoria - 1;
             const match = idCap.match(/\d+/);
@@ -332,7 +342,7 @@
             document.getElementById('titulo').innerText = capituloData.titulo;
             document.getElementById('pregunta').innerText = capituloData.descripcion;
 
-            // Cargar dinámicamente las opciones del capítulo
+            // Cargar dinámicamente las opciones del capítulo desde Supabase
             const { data: opcionesList } = await supabaseClient
                 .from('opciones')
                 .select('*')
@@ -343,12 +353,15 @@
             contenedorOpciones.innerHTML = '';
 
             if (opcionesList && opcionesList.length > 0) {
-                opcionesList.forEach((opcion) => {
+                // Barajamos las opciones aleatoriamente cada vez que se carga el capítulo
+                const opcionesAleatorias = barajarArreglo(opcionesList);
+
+                opcionesAleatorias.forEach((opcion) => {
                     const btn = document.createElement('button');
                     btn.className = 'btn';
-                    btn.dataset.opcionId = opcion.id; // Guardamos el ID para identificarlo al votar
+                    btn.dataset.opcionId = opcion.id; 
                     btn.innerText = opcion.texto_opcion;
-                    btn.onclick = () => procesarSeleccionOpcion(opcion, opcionesList);
+                    btn.onclick = () => procesarSeleccionOpcion(opcion, opcionesAleatorias);
                     contenedorOpciones.appendChild(btn);
                 });
             }
@@ -379,7 +392,7 @@
 
             const totalVotos = todosVotosCapitulo ? todosVotosCapitulo.length : 0;
 
-            // Actualizar el texto de CADA botón con su respectivo porcentaje y votos
+            // Actualizar el texto de CADA botón con su respectivo porcentaje y votos en su celda
             botones.forEach(btn => {
                 const optId = btn.dataset.opcionId;
                 const optOriginal = opcionesList.find(o => o.id.toString() === optId);
