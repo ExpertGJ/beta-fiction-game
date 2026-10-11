@@ -421,8 +421,25 @@
                     });
                 }
 
-                const tituloFinal = epilogoEncontrado ? epilogoEncontrado.titulo_conclusion : 'EPÍLOGO Y CONCLUSIÓN';
-                const textoFinal = epilogoEncontrado ? epilogoEncontrado.texto_epilogo : 'Has completado la historia.';
+                let tituloFinal = epilogoEncontrado ? epilogoEncontrado.titulo_conclusion : 'EPÍLOGO Y CONCLUSIÓN';
+                let textoFinal = epilogoEncontrado ? epilogoEncontrado.texto_epilogo : 'Has completado la historia.';
+
+                // Reemplazo dinámico de los cuatro atributos ({attrX_nombre} y {attrX_val})
+                textoFinal = textoFinal
+                    .replaceAll('{attr1_nombre}', nombresAtributos.attr1)
+                    .replaceAll('{attr1_val}', jugador.attr1)
+                    .replaceAll('{attr2_nombre}', nombresAtributos.attr2)
+                    .replaceAll('{attr2_val}', jugador.attr2)
+                    .replaceAll('{attr3_nombre}', nombresAtributos.attr3)
+                    .replaceAll('{attr3_val}', jugador.attr3)
+                    .replaceAll('{attr4_nombre}', nombresAtributos.attr4)
+                    .replaceAll('{attr4_val}', jugador.attr4);
+
+                tituloFinal = tituloFinal
+                    .replaceAll('{attr1_nombre}', nombresAtributos.attr1)
+                    .replaceAll('{attr2_nombre}', nombresAtributos.attr2)
+                    .replaceAll('{attr3_nombre}', nombresAtributos.attr3)
+                    .replaceAll('{attr4_nombre}', nombresAtributos.attr4);
 
                 document.getElementById('pregunta').innerHTML = `
                     <strong>${tituloFinal}</strong><br><br>
