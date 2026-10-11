@@ -259,7 +259,6 @@
             }
         }
 
-        // Lee los acumuladores globales y calcula los porcentajes al instante sin gastar filas
         async function actualizarEstadisticasComunidad() {
             const { data } = await supabaseClient
                 .from('promedios_globales')
@@ -281,7 +280,6 @@
             document.getElementById('comm-attr4').innerText = Math.round(data.attr4_acum / data.total_partidas);
         }
 
-        // Actualiza de forma atómica la única fila existente de esta historia
         async function registrarPuntajeFinalComunidad() {
             const { data: actual } = await supabaseClient
                 .from('promedios_globales')
@@ -355,7 +353,6 @@
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
 
-                // Sumamos los puntos del jugador a la única fila acumuladora de la historia
                 await registrarPuntajeFinalComunidad();
                 await actualizarEstadisticasComunidad();
 
@@ -405,8 +402,9 @@
             jugador.attr3 = ajustarEscala(jugador.attr3, opcionElegida.attr3_delta || 0);
             jugador.attr4 = ajustarEscala(jugador.attr4, opcionElegida.attr4_delta || 0);
 
+            // CORRECCIÓN: Se envía explícitamente el user_id genérico o 'anon' junto con el capítulo y la opción para que Supabase lo acepte correctamente
             await supabaseClient.from('votos').insert([
-                { capitulo_id: capituloActualId, opcion: opcionElegida.id.toString() }
+                { user_id: 'anonimo', capitulo_id: capituloActualId, opcion: opcionElegida.id.toString() }
             ]);
 
             const { data: todosVotosCapitulo } = await supabaseClient
