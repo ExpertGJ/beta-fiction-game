@@ -139,8 +139,8 @@
         }
         /* Estilos de la tarjeta de donación */
         .donation-box {
-            background: #fff9e6;
-            border: 1px solid #ffe0b2;
+            background: #f0f4f8;
+            border: 1px solid #d9e2ec;
             padding: 14px;
             border-radius: 12px;
             text-align: center;
@@ -153,12 +153,12 @@
         .donation-text {
             font-size: 13px;
             font-style: italic;
-            color: #5c3c10;
+            color: #334e68;
             line-height: 1.4;
             padding: 0 8px;
         }
-        .btn-star {
-            background-color: #ffb300;
+        .btn-paypal {
+            background-color: #0070ba; /* Color clásico de PayPal */
             color: #ffffff;
             border: none;
             padding: 11px 20px;
@@ -166,7 +166,8 @@
             font-size: 14px;
             font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(255, 179, 0, 0.35);
+            box-shadow: 0 2px 6px rgba(0, 112, 186, 0.35);
+            width: 100%;
         }
     </style>
 </head>
@@ -398,9 +399,9 @@
                     
                     <div class="donation-box">
                         <div class="donation-text">
-                            Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo para seguir creando nuevas aventuras para toda la comunidad.
+                            ¿Disfrutaste esta historia? Tu aporte nos ayuda a cubrir los costos para mantener vivo este proyecto y seguir creando nuevas aventuras para ti.
                         </div>
-                        <button class="btn-star" onclick="donarEstrellas(50)">Donar por PayPal</button>
+                        <button class="btn-paypal" onclick="donarPayPal()">Donar por PayPal</button>
                     </div>
                 `;
                 
@@ -437,16 +438,12 @@
             }
         }
 
-        // Función para procesar donaciones con estrellas
-        function donarEstrellas(cantidad = 50) {
+        // Función para abrir el enlace de PayPal de forma fluida
+        function donarPayPal() {
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             
-            if (tg.openInvoice) {
-                // Aquí conectarías con el enlace de factura generado por tu backend del bot
-                // tg.openInvoice(invoiceLink, (status) => { ... });
-            } else {
-                alert(`¡Gracias por tu intención de donar ${cantidad} 🌟 Estrellas!`);
-            }
+            // Abre el enlace directo de PayPal configurado
+            window.open('https://www.paypal.com/ncp/payment/AL9YL9KANT3P8', '_blank');
         }
 
         async function procesarSeleccionOpcion(opcionElegida, opcionesList) {
@@ -510,26 +507,3 @@
             contenedorLista.innerHTML = '';
 
             lista.forEach(h => {
-                if (h.historia_id !== historiaActualId) {
-                    const card = document.createElement('div');
-                    card.className = 'story-card';
-                    card.innerText = h.titulo_historia;
-                    card.onclick = async () => {
-                        historiaActualId = h.historia_id;
-                        capituloActualId = 'cap_1';
-                        pasoActualIndex = 0; 
-                        jugador = { attr1: 50, attr2: 50, attr3: 50, attr4: 50 };
-                        document.getElementById('progress-bars-container').style.display = 'flex';
-                        
-                        await cargarConfiguracionHistoria(historiaActualId);
-                        cargarCapitulo(capituloActualId);
-                    };
-                    contenedorLista.appendChild(card);
-                }
-            });
-
-            document.getElementById('otras-historias').style.display = 'block';
-        }
-    </script>
-</body>
-</html>
