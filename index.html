@@ -207,7 +207,6 @@
             return Math.min(100, Math.max(0, actual + delta));
         }
 
-        // Función para mezclar un arreglo de forma aleatoria (Fisher-Yates)
         function barajarArreglo(array) {
             let arr = [...array];
             for (let i = arr.length - 1; i > 0; i--) {
@@ -260,24 +259,52 @@
             }
         }
 
+        // Lee los acumuladores globales y calcula los porcentajes al instante sin gastar filas
         async function actualizarEstadisticasComunidad() {
-            const { data: todosLosVotos } = await supabaseClient
-                .from('votos')
-                .select('*');
+            const { data } = await supabaseClient
+                .from('promedios_globales')
+                .select('*')
+                .eq('historia_id', historiaActualId)
+                .maybeSingle();
 
-            if (!todosLosVotos || todosLosVotos.length === 0) return;
+            if (!data || data.total_partidas === 0) {
+                document.getElementById('comm-attr1').innerText = '50';
+                document.getElementById('comm-attr2').innerText = '50';
+                document.getElementById('comm-attr3').innerText = '50';
+                document.getElementById('comm-attr4').innerText = '50';
+                return;
+            }
 
-            let totalPartidas = todosLosVotos.length;
-            let a1 = 50 * totalPartidas, a2 = 50 * totalPartidas, a3 = 50 * totalPartidas, a4 = 50 * totalPartidas;
+            document.getElementById('comm-attr1').innerText = Math.round(data.attr1_acum / data.total_partidas);
+            document.getElementById('comm-attr2').innerText = Math.round(data.attr2_acum / data.total_partidas);
+            document.getElementById('comm-attr3').innerText = Math.round(data.attr3_acum / data.total_partidas);
+            document.getElementById('comm-attr4').innerText = Math.round(data.attr4_acum / data.total_partidas);
+        }
 
-            todosLosVotos.forEach(v => {
-                a1 += 10; a2 -= 2; a3 += 5; a4 -= 5;
-            });
+        // Actualiza de forma atómica la única fila existente de esta historia
+        async function registrarPuntajeFinalComunidad() {
+            const { data: actual } = await supabaseClient
+                .from('promedios_globales')
+                .select('*')
+                .eq('historia_id', historiaActualId)
+                .maybeSingle();
 
-            document.getElementById('comm-attr1').innerText = Math.min(100, Math.max(0, Math.round(a1 / totalPartidas)));
-            document.getElementById('comm-attr2').innerText = Math.min(100, Math.max(0, Math.round(a2 / totalPartidas)));
-            document.getElementById('comm-attr3').innerText = Math.min(100, Math.max(0, Math.round(a3 / totalPartidas)));
-            document.getElementById('comm-attr4').innerText = Math.min(100, Math.max(0, Math.round(a4 / totalPartidas)));
+            let nuevoTotal = (actual ? actual.total_partidas : 0) + 1;
+            let nuevo1 = (actual ? actual.attr1_acum : 0) + jugador.attr1;
+            let nuevo2 = (actual ? actual.attr2_acum : 0) + jugador.attr2;
+            let nuevo3 = (actual ? actual.attr3_acum : 0) + jugador.attr3;
+            let nuevo4 = (actual ? actual.attr4_acum : 0) + jugador.attr4;
+
+            await supabaseClient
+                .from('promedios_globales')
+                .update({
+                    total_partidas: nuevoTotal,
+                    attr1_acum: nuevo1,
+                    attr2_acum: nuevo2,
+                    attr3_acum: nuevo3,
+                    attr4_acum: nuevo4
+                })
+                .eq('historia_id', historiaActualId);
         }
 
         async function iniciarApp() {
@@ -328,6 +355,10 @@
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
 
+                // Sumamos los puntos del jugador a la única fila acumuladora de la historia
+                await registrarPuntajeFinalComunidad();
+                await actualizarEstadisticasComunidad();
+
                 document.getElementById('titulo').innerText = '🏆 Fin de la Aventura';
                 document.getElementById('pregunta').innerText = `Has completado la historia.\n\n📊 Tu Resultado Individual:\n` +
                     `${nombresAtributos.attr1}: ${jugador.attr1}% | ${nombresAtributos.attr2}: ${jugador.attr2}%\n` +
@@ -342,7 +373,6 @@
             document.getElementById('titulo').innerText = capituloData.titulo;
             document.getElementById('pregunta').innerText = capituloData.descripcion;
 
-            // Cargar dinámicamente las opciones del capítulo desde Supabase
             const { data: opcionesList } = await supabaseClient
                 .from('opciones')
                 .select('*')
@@ -353,7 +383,6 @@
             contenedorOpciones.innerHTML = '';
 
             if (opcionesList && opcionesList.length > 0) {
-                // Barajamos las opciones aleatoriamente cada vez que se carga el capítulo
                 const opcionesAleatorias = barajarArreglo(opcionesList);
 
                 opcionesAleatorias.forEach((opcion) => {
@@ -368,9 +397,6 @@
         }
 
         async function procesarSeleccionOpcion(opcionElegida, opcionesList) {
-            const telegramUser = tg.initDataUnsafe?.user;
-            
-            // Deshabilitar todos los botones de opciones
             const botones = document.querySelectorAll('#opciones-container .btn');
             botones.forEach(b => b.disabled = true);
 
@@ -379,12 +405,10 @@
             jugador.attr3 = ajustarEscala(jugador.attr3, opcionElegida.attr3_delta || 0);
             jugador.attr4 = ajustarEscala(jugador.attr4, opcionElegida.attr4_delta || 0);
 
-            // Registrar el voto en Supabase
             await supabaseClient.from('votos').insert([
-                { user_id: telegramUser.id.toString(), capitulo_id: capituloActualId, opcion: opcionElegida.id.toString() }
+                { capitulo_id: capituloActualId, opcion: opcionElegida.id.toString() }
             ]);
 
-            // Obtener todos los votos de este capítulo para calcular porcentajes por opción
             const { data: todosVotosCapitulo } = await supabaseClient
                 .from('votos')
                 .select('opcion')
@@ -392,7 +416,6 @@
 
             const totalVotos = todosVotosCapitulo ? todosVotosCapitulo.length : 0;
 
-            // Actualizar el texto de CADA botón con su respectivo porcentaje y votos en su celda
             botones.forEach(btn => {
                 const optId = btn.dataset.opcionId;
                 const optOriginal = opcionesList.find(o => o.id.toString() === optId);
@@ -403,9 +426,6 @@
                 btn.innerHTML = `${optOriginal.texto_opcion}<br><span style="font-size: 13px; font-weight: normal;">${porcentaje}% (${votosEstaOpc} votos)</span>`;
             });
 
-            await actualizarEstadisticasComunidad();
-
-            // Las barritas se quedan quietas y avanzan únicamente al presionar "Siguiente Capítulo"
             const btnNext = document.getElementById('btn_next');
             btnNext.style.display = 'block';
             btnNext.onclick = () => {
