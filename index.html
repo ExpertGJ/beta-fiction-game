@@ -137,6 +137,7 @@
             border-radius: 12px;
             text-align: center;
         }
+        /* Estilos de la tarjeta de donación */
         .donation-box {
             background: #fff9e6;
             border: 1px solid #ffe0b2;
@@ -156,8 +157,8 @@
             line-height: 1.4;
             padding: 0 8px;
         }
-        .btn-paypal {
-            background-color: #0070ba;
+        .btn-channel {
+            background-color: #2481cc;
             color: #ffffff;
             border: none;
             padding: 11px 20px;
@@ -165,7 +166,7 @@
             font-size: 14px;
             font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0, 112, 186, 0.35);
+            box-shadow: 0 2px 6px rgba(36, 129, 204, 0.35);
         }
     </style>
 </head>
@@ -397,9 +398,9 @@
                     
                     <div class="donation-box">
                         <div class="donation-text">
-                            Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo para seguir creando nuevas aventuras para toda la comunidad.
+                            Mantener este espacio vivo requiere tiempo y recursos. Si disfrutaste nuestra historia, apóyanos ahora mismo enviando un regalo en nuestro canal.
                         </div>
-                        <button class="btn-paypal" onclick="abrirPagoPayPal()">Apoyar con PayPal</button>
+                        <button class="btn-channel" onclick="abrirCanalRegalos()">🎁 Enviar Regalo en el Canal</button>
                     </div>
                 `;
                 
@@ -436,18 +437,17 @@
             }
         }
 
-        // Función corregida para abrir PayPal externamente usando el SDK de Telegram
-        function abrirPagoPayPal() {
+        // Función para abrir el canal de Telegram nativamente de forma segura
+        function abrirCanalRegalos() {
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             
-            const urlPayPal = 'https://www.paypal.com/ncp/payment/AL9YL9KANT3P8';
+            // Reemplaza 'https://t.me/tu_canal' con el link real de tu canal o de una publicación específica
+            const urlCanal = 'https://t.me/tu_canal';
 
-            // Comprueba si Telegram WebApp soporta abrir enlaces de forma nativa
             if (tg && typeof tg.openLink === 'function') {
-                tg.openLink(urlPayPal);
+                tg.openLink(urlCanal);
             } else {
-                // Alternativa de respaldo si se abre en un navegador web convencional de escritorio
-                window.open(urlPayPal, '_blank');
+                window.open(urlCanal, '_blank');
             }
         }
 
@@ -457,7 +457,7 @@
 
             jugador.attr1 = ajustarEscala(jugador.attr1, opcionElegida.attr1_delta || 0);
             jugador.attr2 = ajustarEscala(jugador.attr2, opcionElegida.attr2_delta || 0);
-            jugador.attr3 = ajustarEscala(jugador.attr3, opcionEgilida.attr3_delta || 0); // Nota: corregido error tipográfico en attr3_delta si existía, de lo contrario se mantiene igual.
+            jugador.attr3 = ajustarEscala(jugador.attr3, opcionElegida.attr3_delta || 0);
             jugador.attr4 = ajustarEscala(jugador.attr4, opcionElegida.attr4_delta || 0);
 
             const nuevoConteo = (opcionElegida.votos_contador || 0) + 1;
