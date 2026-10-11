@@ -94,6 +94,13 @@
             gap: 10px;
             width: 100%;
         }
+        .instruction-hint {
+            font-style: italic;
+            text-align: center;
+            font-size: 14px;
+            margin-top: 4px;
+            color: var(--tg-theme-hint-color, #707579);
+        }
         .btn {
             background-color: var(--tg-theme-button-color, #2481cc);
             color: var(--tg-theme-button-text-color, #ffffff);
@@ -204,6 +211,9 @@
         
         <!-- Contenedor dinámico de opciones -->
         <div id="opciones-container" class="options-container"></div>
+        
+        <!-- Texto agregado debajo de las opciones -->
+        <div id="hint-siguiente" class="instruction-hint">¡Elige una opción y presiona siguiente!</div>
 
         <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
 
@@ -381,6 +391,7 @@
 
         async function cargarCapitulo(idCapitulo) {
             document.getElementById('btn_next').style.display = 'none';
+            document.getElementById('hint-siguiente').style.display = 'block';
             document.getElementById('otras-historias').style.display = 'none';
             
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
@@ -409,6 +420,7 @@
                 await actualizarEstadisticasComunidad();
 
                 document.getElementById('titulo').style.display = 'none';
+                document.getElementById('hint-siguiente').style.display = 'none';
 
                 let tituloFinal = (capituloData && capituloData.titulo) ? capituloData.titulo : 'EPÍLOGO Y CONCLUSIÓN';
                 let textoFinal = (capituloData && capituloData.descripcion) ? capituloData.descripcion : 'Has completado la historia.';
@@ -469,6 +481,21 @@
             const contenedorOpciones = document.getElementById('opciones-container');
             contenedorOpciones.innerHTML = '';
 
+            // Si no hay opciones definidas en la base de datos para este capítulo intermedio
+            if (!opcionesList || opcionesList.length === 0) {
+                document.getElementById('hint-siguiente').style.display = 'none';
+                const btnNext = document.getElementById('btn_next');
+                btnNext.style.display = 'block';
+                btnNext.onclick = () => {
+                    // Si no hay opción elegida, avanza al siguiente capítulo predeterminado o id numérico siguiente
+                    let siguienteCapId = `cap_${parseInt(idCapitulo.replace(/\D/g, '')) + 1}`;
+                    pasoActualIndex = obtenerIndicePorIdCapitulo(siguienteCapId);
+                    capituloActualId = siguienteCapId;
+                    cargarCapitulo(capituloActualId);
+                };
+                return;
+            }
+
             const opcionesAleatorias = barajarArreglo(opcionesList);
 
             opcionesAleatorias.forEach((opcion) => {
@@ -496,6 +523,9 @@
         async function procesarSeleccionOpcion(opcionElegida, opcionesList) {
             const botones = document.querySelectorAll('#opciones-container .btn');
             botones.forEach(b => b.disabled = true);
+            
+            // Ocultar el texto de aviso una vez que se selecciona una opción
+            document.getElementById('hint-siguiente').style.display = 'none';
 
             jugador.attr1 = ajustarEscala(jugador.attr1, opcionElegida.attr1_delta || 0);
             jugador.attr2 = ajustarEscala(jugador.attr2, opcionElegida.attr2_delta || 0);
