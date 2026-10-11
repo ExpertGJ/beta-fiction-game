@@ -81,6 +81,12 @@
             line-height: 1.4;
             text-align: center;
         }
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+        }
         .btn {
             background-color: var(--tg-theme-button-color, #2481cc);
             color: var(--tg-theme-button-text-color, #ffffff);
@@ -155,8 +161,8 @@
         <div id="titulo" class="title">Cargando...</div>
         <div id="pregunta" class="question">Por favor, espera...</div>
         
-        <button id="btn_a" class="btn" disabled>Opción A</button>
-        <button id="btn_b" class="btn" disabled>Opción B</button>
+        <!-- Contenedor dinámico limpio (sin huecos vacíos) -->
+        <div id="opciones-container" class="options-container"></div>
 
         <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
 
@@ -201,7 +207,6 @@
             return Math.min(100, Math.max(0, actual + delta));
         }
 
-        // Función inteligente: Lee el ID del capítulo (ej: 'cap_2a', 'cap_3', 'fin') y determina cuántas barras iluminar
         function obtenerIndicePorIdCapitulo(idCap) {
             if (idCap === 'fin') return totalPasosHistoria - 1;
             const match = idCap.match(/\d+/);
@@ -256,11 +261,7 @@
             let a1 = 50 * totalPartidas, a2 = 50 * totalPartidas, a3 = 50 * totalPartidas, a4 = 50 * totalPartidas;
 
             todosLosVotos.forEach(v => {
-                if (v.opcion === 'A') {
-                    a1 += 10; a2 -= 5; a3 += 10; a4 -= 10;
-                } else {
-                    a1 -= 5; a2 += 10; a3 -= 5; a4 += 5;
-                }
+                a1 += 10; a2 -= 2; a3 += 5; a4 -= 5;
             });
 
             document.getElementById('comm-attr1').innerText = Math.min(100, Math.max(0, Math.round(a1 / totalPartidas)));
@@ -306,14 +307,14 @@
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
             actualizarBarritasProgreso();
 
-            const { data, error } = await supabaseClient
+            const { data: capituloData, error } = await supabaseClient
                 .from('capitulos')
                 .select('*')
                 .eq('historia_id', historiaActualId)
                 .eq('id', idCapitulo)
                 .maybeSingle();
 
-            if (error || !data || idCapitulo === 'fin') {
+            if (error || !capituloData || idCapitulo === 'fin') {
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
 
@@ -321,70 +322,61 @@
                 document.getElementById('pregunta').innerText = `Has completado la historia.\n\n📊 Tu Resultado Individual:\n` +
                     `${nombresAtributos.attr1}: ${jugador.attr1}% | ${nombresAtributos.attr2}: ${jugador.attr2}%\n` +
                     `${nombresAtributos.attr3}: ${jugador.attr3}% | ${nombresAtributos.attr4}: ${jugador.attr4}%`;
-                document.getElementById('btn_a').style.display = 'none';
-                document.getElementById('btn_b').style.display = 'none';
+                document.getElementById('opciones-container').innerHTML = '';
                 document.getElementById('progress-bars-container').style.display = 'none';
                 
                 mostrarOtrasHistorias();
                 return;
             }
 
-            document.getElementById('titulo').innerText = data.titulo;
-            document.getElementById('pregunta').innerText = data.descripcion;
-            
-            const btnA = document.getElementById('btn_a');
-            const btnB = document.getElementById('btn_b');
+            document.getElementById('titulo').innerText = capituloData.titulo;
+            document.getElementById('pregunta').innerText = capituloData.descripcion;
 
-            btnA.innerText = data.opcion_a_texto;
-            btnB.innerText = data.opcion_b_texto;
-            btnA.disabled = false;
-            btnB.disabled = false;
-            btnA.style.display = 'block';
-            btnB.style.display = 'block';
+            // Carga dinámica de las opciones de este capítulo exacto (crea solo los botones necesarios)
+            const { data: opcionesList } = await supabaseClient
+                .from('opciones')
+                .select('*')
+                .eq('historia_id', historiaActualId)
+                .eq('capitulo_id', idCapitulo);
 
-            btnA.onclick = () => procesarVoto('A', data.opcion_a_siguiente, data.opcion_a_attr1, data.opcion_a_attr2, data.opcion_a_attr3, data.opcion_a_attr4, data);
-            btnB.onclick = () => procesarVoto('B', data.opcion_b_siguiente, data.opcion_b_attr1, data.opcion_b_attr2, data.opcion_b_attr3, data.opcion_b_attr4, data);
+            const contenedorOpciones = document.getElementById('opciones-container');
+            contenedorOpciones.innerHTML = '';
+
+            if (opcionesList && opcionesList.length > 0) {
+                opcionesList.forEach((opcion) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn';
+                    btn.innerText = opcion.texto_opcion;
+                    btn.onclick = () => procesarSeleccionOpcion(opcion);
+                    contenedorOpciones.appendChild(btn);
+                });
+            }
         }
 
-        async function procesarVoto(opcionElegida, siguienteId, dA1, dA2, dA3, dA4, datosCap) {
+        async function procesarSeleccionOpcion(opcionElegida) {
             const telegramUser = tg.initDataUnsafe?.user;
             
-            document.getElementById('btn_a').disabled = true;
-            document.getElementById('btn_b').disabled = true;
+            const botones = document.querySelectorAll('#opciones-container .btn');
+            botones.forEach(b => b.disabled = true);
 
-            jugador.attr1 = ajustarEscala(jugador.attr1, dA1 || 0);
-            jugador.attr2 = ajustarEscala(jugador.attr2, dA2 || 0);
-            jugador.attr3 = ajustarEscala(jugador.attr3, dA3 || 0);
-            jugador.attr4 = ajustarEscala(jugador.attr4, dA4 || 0);
+            jugador.attr1 = ajustarEscala(jugador.attr1, opcionElegida.attr1_delta || 0);
+            jugador.attr2 = ajustarEscala(jugador.attr2, opcionElegida.attr2_delta || 0);
+            jugador.attr3 = ajustarEscala(jugador.attr3, opcionElegida.attr3_delta || 0);
+            jugador.attr4 = ajustarEscala(jugador.attr4, opcionElegida.attr4_delta || 0);
 
             await supabaseClient.from('votos').insert([
-                { user_id: telegramUser.id.toString(), capitulo_id: capituloActualId, opcion: opcionElegida }
+                { user_id: telegramUser.id.toString(), capitulo_id: capituloActualId, opcion: opcionElegida.id.toString() }
             ]);
-
-            const { data: todosVotos } = await supabaseClient
-                .from('votos')
-                .select('opcion')
-                .eq('capitulo_id', capituloActualId);
-
-            const total = todosVotos.length;
-            const votosA = todosVotos.filter(v => v.opcion === 'A').length;
-            const votosB = total - votosA;
-            const porcA = total > 0 ? Math.round((votosA / total) * 100) : 0;
-            const porcB = total > 0 ? 100 - porcA : 0;
-
-            document.getElementById('btn_a').innerHTML = `${datosCap.opcion_a_texto}<br><span style="font-size: 13px; font-weight: normal;">Opción A: ${porcA}% (${votosA} votos)</span>`;
-            document.getElementById('btn_b').innerHTML = `${datosCap.opcion_b_texto}<br><span style="font-size: 13px; font-weight: normal;">Opción B: ${porcB}% (${votosB} votos)</span>`;
 
             await actualizarEstadisticasComunidad();
 
-            // Las barritas NO se actualizan aquí al votar, se quedan quietas.
+            // Las barritas se quedan quietas al votar y solo avanzan al presionar "Siguiente"
             const btnNext = document.getElementById('btn_next');
             btnNext.style.display = 'block';
             btnNext.onclick = () => {
-                // Las barritas se actualizan y avanzan únicamente al presionar "Siguiente Capítulo"
-                pasoActualIndex = obtenerIndicePorIdCapitulo(siguienteId);
-                capituloActualId = siguienteId;
-                cargarCapitulo(siguienteId);
+                pasoActualIndex = obtenerIndicePorIdCapitulo(opcionElegida.siguiente_capitulo);
+                capituloActualId = opcionElegida.siguiente_capitulo;
+                cargarCapitulo(capituloActualId);
             };
 
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
