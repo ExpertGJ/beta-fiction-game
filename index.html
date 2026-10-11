@@ -313,17 +313,14 @@
         }
 
         async function actualizarEstadisticasComunidad() {
-            const { data } = await supabaseClient
+            const { data, error } = await supabaseClient
                 .from('promedios_globales')
                 .select('*')
                 .eq('historia_id', historiaActualId)
                 .maybeSingle();
 
-            if (!data || data.total_partidas === 0) {
-                document.getElementById('comm-attr1').innerText = '50';
-                document.getElementById('comm-attr2').innerText = '50';
-                document.getElementById('comm-attr3').innerText = '50';
-                document.getElementById('comm-attr4').innerText = '50';
+            // Si hay un error en la red o la tabla no responde, conservamos los valores previos en pantalla para evitar parpadeos en 50
+            if (error || !data || !data.total_partidas || data.total_partidas <= 0) {
                 return;
             }
 
@@ -340,22 +337,23 @@
                 .eq('historia_id', historiaActualId)
                 .maybeSingle();
 
-            let nuevoTotal = (actual ? actual.total_partidas : 0) + 1;
-            let nuevo1 = (actual ? actual.attr1_acum : 0) + jugador.attr1;
-            let nuevo2 = (actual ? actual.attr2_acum : 0) + jugador.attr2;
-            let nuevo3 = (actual ? actual.attr3_acum : 0) + jugador.attr3;
-            let nuevo4 = (actual ? actual.attr4_acum : 0) + jugador.attr4;
+            let nuevoTotal = (actual && actual.total_partidas) ? actual.total_partidas + 1 : 1;
+            let nuevo1 = (actual && actual.attr1_acum) ? actual.attr1_acum + jugador.attr1 : jugador.attr1;
+            let nuevo2 = (actual && actual.attr2_acum) ? actual.attr2_acum + jugador.attr2 : jugador.attr2;
+            let nuevo3 = (actual && actual.attr3_acum) ? actual.attr3_acum + jugador.attr3 : jugador.attr3;
+            let nuevo4 = (actual && actual.attr4_acum) ? actual.attr4_acum + jugador.attr4 : jugador.attr4;
 
+            // Usamos upsert para asegurar que si el registro no existía previamente, se cree correctamente sin fallar
             await supabaseClient
                 .from('promedios_globales')
-                .update({
+                .upsert({
+                    historia_id: historiaActualId,
                     total_partidas: nuevoTotal,
                     attr1_acum: nuevo1,
                     attr2_acum: nuevo2,
                     attr3_acum: nuevo3,
                     attr4_acum: nuevo4
-                })
-                .eq('historia_id', historiaActualId);
+                }, { onConflict: 'historia_id' });
         }
 
         async function iniciarApp() {
@@ -487,7 +485,6 @@
                 const btnNext = document.getElementById('btn_next');
                 btnNext.style.display = 'block';
                 btnNext.onclick = () => {
-                    // Si no hay opción elegida, avanza al siguiente capítulo predeterminado o id numérico siguiente
                     let siguienteCapId = `cap_${parseInt(idCapitulo.replace(/\D/g, '')) + 1}`;
                     pasoActualIndex = obtenerIndicePorIdCapitulo(siguienteCapId);
                     capituloActualId = siguienteCapId;
@@ -524,7 +521,6 @@
             const botones = document.querySelectorAll('#opciones-container .btn');
             botones.forEach(b => b.disabled = true);
             
-            // Ocultar el texto de aviso una vez que se selecciona una opción
             document.getElementById('hint-siguiente').style.display = 'none';
 
             jugador.attr1 = ajustarEscala(jugador.attr1, opcionElegida.attr1_delta || 0);
@@ -596,6 +592,7 @@
                         document.getElementById('progress-bars-container').style.display = 'flex';
                         
                         await cargarConfiguracionHistoria(historiaActualId);
+                        await actualizarEstadisticasComunidad();
                         cargarCapitulo(capituloActualId);
                     };
                     contenedorLista.appendChild(card);
