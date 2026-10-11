@@ -290,9 +290,9 @@
                 document.getElementById('lbl-attr3').innerText = data.attr_3_nombre;
                 document.getElementById('lbl-attr4').innerText = data.attr_4_nombre;
 
-                // Mostrar el Título y Autor en el panel superior (Ej: "Título, de G.J. Santos")
+                // Mostrar el Título y Autor en el panel superior (Ej: "Título – G.J. Santos")
                 const autor = data.autor || 'G.J. Santos';
-                document.getElementById('story-title-author').innerText = `${data.titulo_historia}, de ${autor}`;
+                document.getElementById('story-title-author').innerText = `${data.titulo_historia} – ${autor}`;
             }
         }
 
