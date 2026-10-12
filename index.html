@@ -397,16 +397,25 @@
         }
 
         async function cargarConfiguracionHistoria(hId) {
-            const { data } = await supabaseClient
+            // El código verifica y cuenta de forma automática los capítulos reales en la tabla 'capitulos'
+            const { count, error } = await supabaseClient
+                .from('capitulos')
+                .select('*', { count: 'exact', head: true })
+                .eq('historia_id', hId);
+
+            if (!error && count && count > 0) {
+                totalPasosHistoria = count;
+            }
+
+            const { data: configData } = await supabaseClient
                 .from('config_historia')
                 .select('*')
                 .eq('historia_id', hId)
                 .maybeSingle();
 
-            if (data) {
-                totalPasosHistoria = data.total_pasos || 3;
-                autorActualNombre = data.autor || 'Desconocido';
-                document.getElementById('story-title-author').innerText = data.titulo_historia;
+            if (configData) {
+                autorActualNombre = configData.autor || 'Desconocido';
+                document.getElementById('story-title-author').innerText = configData.titulo_historia;
                 document.getElementById('story-author-name').innerText = `Autor: ${autorActualNombre}`;
             }
         }
