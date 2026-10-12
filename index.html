@@ -307,7 +307,7 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        let historiaActualId = 'mansion_misterio';
+        let historiaActualId = '';
         let capituloActualId = 'cap_1';
         let totalPasosHistoria = 3; 
         let pasoActualIndex = 0; 
@@ -359,11 +359,12 @@
         }
 
         async function cargarListaHistoriasGlobal() {
-            // Filtra únicamente las historias que tengan estado 'publico'
+            // Filtra únicamente las públicas y las ordena de la más nueva a la más antigua
             const { data } = await supabaseClient
                 .from('config_historia')
                 .select('*')
-                .eq('estado', 'publico');
+                .eq('estado', 'publico')
+                .order('id', { ascending: false });
             if (data) {
                 listaTodasHistorias = data;
             }
@@ -511,7 +512,7 @@
             verificarParametroHistoria();
             await cargarListaHistoriasGlobal();
 
-            // Si no hay ninguna historia pública disponible, mostramos un mensaje arregladito
+            // Si no hay ninguna historia pública disponible, mostramos el mensaje arreglado
             if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
                 document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
@@ -522,16 +523,9 @@
                 return;
             }
 
-            // Cargar por defecto la primera historia que esté pública
-            const { data: historiaActiva } = await supabaseClient
-                .from('config_historia')
-                .select('*')
-                .eq('estado', 'publico')
-                .limit(1)
-                .maybeSingle();
-
-            if (!params.get('historia') && !params.get('startapp') && !startParam && historiaActiva) {
-                historiaActualId = historiaActiva.historia_id;
+            // Si entra por enlace genérico, cargamos automáticamente la última historia publicada (la primera del arreglo ordenado)
+            if (!params.get('historia') && !params.get('startapp') && !startParam) {
+                historiaActualId = listaTodasHistorias[0].historia_id;
             }
 
             pasoActualIndex = 0;
