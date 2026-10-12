@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Narrativa Interactiva</title>
+    <title>Beta Reads</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -227,6 +227,7 @@
         }
         .btn-share {
             background-color: #17a2b8;
+            margin-top: 6px;
         }
     </style>
 </head>
@@ -272,7 +273,7 @@
 
     <script>
         const SUPABASE_URL = 'https://cnhtbdzzcfvrdkqzrfjf.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuaHRiZHp6Y2Z2cmRrcXpyZmpmIiwicm9sZSI6ImFub24iOjE3OTE2NDUzMTcsImV4cCI6MjEwNzIyMTMxN30.nBKNHG4ArcWkctm8n-rF592wZ2Aa7MG4fS-qswboWD0';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuaHRiZHp6Y2Z2cmRrcXpyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDUzMTcsImV4cCI6MjEwNzIyMTMxN30.nBKNHG4ArcWkctm8n-rF592wZ2Aa7MG4fS-qswboWD0';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: { persistSession: false }
@@ -287,10 +288,14 @@
         let pasoActualIndex = 0; 
         let autorActualNombre = '';
 
-        // Al iniciar, verifica si viene una historia específica por parámetro en el URL (ej: ?historia=apocalipsis_zombie)
         function verificarParametroHistoria() {
             const params = new URLSearchParams(window.location.search);
-            const historiaParam = params.get('historia');
+            let historiaParam = params.get('historia');
+            
+            if (!historiaParam && tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
+                historiaParam = tg.initDataUnsafe.start_param;
+            }
+
             if (historiaParam) {
                 historiaActualId = historiaParam;
             }
@@ -397,11 +402,14 @@
 
         async function iniciarApp() {
             const telegramUser = tg.initDataUnsafe?.user;
-            if (!telegramUser || !telegramUser.id) {
+            const params = new URLSearchParams(window.location.search);
+            const startParam = tg.initDataUnsafe?.start_param;
+            
+            if ((!telegramUser || !telegramUser.id) && !params.get('historia') && !startParam) {
                 document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
                         <h3>Acceso Restringido</h3>
-                        <p>Abre esta Mini App directamente desde Telegram para jugar.</p>
+                        <p>Abre esta Mini App directamente desde Telegram.</p>
                     </div>
                 `;
                 return;
@@ -416,7 +424,7 @@
                 .limit(1)
                 .maybeSingle();
 
-            if (!window.location.search.includes('historia=') && historiaActiva) {
+            if (!params.get('historia') && !startParam && historiaActiva) {
                 historiaActualId = historiaActiva.historia_id;
             }
 
@@ -460,11 +468,12 @@
 
                     <div class="donation-box">
                         <div class="donation-text">
-                            ¿Te gustó esta lectura? Compártela con tus amigos o apóyanos enviando un regalo a nuestro canal.
+                            Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
                         </div>
-                        <button class="btn btn-share" onclick="compartirHistoria()">Compartir Historia ↗</button>
                         <button class="btn-channel" onclick="abrirCanalRegalos()">Enviar Regalo</button>
                     </div>
+
+                    <button class="btn btn-share" onclick="compartirHistoria()">Compartir Historia ↗</button>
                 `;
                 
                 document.getElementById('opciones-container').innerHTML = '';
@@ -512,18 +521,18 @@
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
 
             const tituloObra = document.getElementById('story-title-author').innerText;
-            const baseUrl = window.location.href.split('?')[0];
-            const linkEspecifico = `${baseUrl}?historia=${historiaActualId}`;
-            const textoCompartir = `¡Lee "${tituloObra}" escrita por ${autorActualNombre} en Beta Reads! 📖✨ Pruébala aquí: ${linkEspecifico}`;
+            const botUsername = 'BetaReadsBot'; // Reemplaza esto si tu nuevo bot tiene otro nombre de usuario exacto en BotFather
+            
+            // Enlace especial de Telegram nativo para abrir directo la Mini App con la historia
+            const linkDirectoApp = `https://t.me/${botUsername}/app?startapp=${historiaActualId}`;
+
+            // Abre el selector de Telegram para compartir utilizando la URL nativa directa
+            const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(linkDirectoApp)}&text=${encodeURIComponent(`¡Lee "${tituloObra}" en Beta Reads! 📖✨`)}`;
 
             if (tg && typeof tg.openTelegramLink === 'function') {
-                // Abre el selector nativo de Telegram para reenviar a chats o canales
-                const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(linkEspecifico)}&text=${encodeURIComponent(`¡Lee "${tituloObra}" en Beta Reads! 📖`)}`;
                 tg.openTelegramLink(urlTelegramShare);
             } else {
-                navigator.clipboard.writeText(linkEspecifico).then(() => {
-                    alert('¡Enlace de la historia copiado al portapapeles!');
-                });
+                window.open(urlTelegramShare, '_blank');
             }
         }
 
