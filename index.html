@@ -513,6 +513,7 @@
             document.getElementById('btn_next').style.display = 'none';
             document.getElementById('hint-siguiente').style.display = 'block';
             document.getElementById('otras-historias').style.display = 'none';
+            document.getElementById('progress-bars-container').style.display = 'flex';
             
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
             pasoActualIndex = obtenerIndicePorIdCapitulo(idCapitulo);
@@ -524,48 +525,10 @@
                 .eq('historia_id', historiaActualId)
                 .eq('capitulo_id', idCapitulo);
 
-            // Filtrar opciones vacías o con texto 'EMPTY'
+            // Filtrar opciones válidas o EMPTY
             const opcionesValidas = opcionesList ? opcionesList.filter(o => o.texto_opcion && o.texto_opcion.trim() !== '' && o.texto_opcion.trim() !== 'EMPTY') : [];
 
-            if (idCapitulo === 'fin' || idCapitulo.includes('epilogo') || opcionesValidas.length === 0) {
-                // Si es el final o no hay opciones válidas, manejamos el flujo de cierre o avance directo
-                if (idCapitulo === 'fin' || idCapitulo.includes('epilogo') || !opcionesList || opcionesList.length === 0) {
-                    // Si es realmente el final de la historia (epílogo o fin)
-                    if (idCapitulo === 'fin' || idCapitulo.includes('epilogo')) {
-                        pasoActualIndex = totalPasosHistoria - 1;
-                        actualizarBarritasProgreso();
-
-                        document.getElementById('titulo').style.display = 'none';
-                        document.getElementById('hint-siguiente').style.display = 'none';
-                        document.getElementById('pregunta').innerText = '';
-
-                        document.getElementById('pregunta').innerHTML = `
-                            <div class="rating-box" id="seccion-votacion-estrellas">
-                                <div style="font-weight: bold; font-size: 14px;">¿Qué te pareció la historia? Califícala:</div>
-                                <div class="interactive-stars" id="star-selector">
-                                    <span onclick="registrarVotoEstrellas(1)">★</span><span onclick="registrarVotoEstrellas(2)">★</span><span onclick="registrarVotoEstrellas(3)">★</span><span onclick="registrarVotoEstrellas(4)">★</span><span onclick="registrarVotoEstrellas(5)">★</span>
-                                </div>
-                            </div>
-
-                            <div class="donation-box">
-                                <div class="donation-text">
-                                    Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
-                                </div>
-                                <button class="btn-channel" onclick="abrirCanalRegalos()">Enviar Regalo</button>
-                            </div>
-
-                            <button class="btn btn-share" onclick="compartirHistoria()">Compartir Historia</button>
-                        `;
-                        
-                        document.getElementById('opciones-container').innerHTML = '';
-                        document.getElementById('progress-bars-container').style.display = 'none';
-                        
-                        mostrarOtrasHistorias();
-                        return;
-                    }
-                }
-            }
-
+            // Consultar los datos del capítulo actual (título y descripción)
             const { data: capituloData, error } = await supabaseClient
                 .from('capitulos')
                 .select('*')
@@ -589,7 +552,50 @@
             const contenedorOpciones = document.getElementById('opciones-container');
             contenedorOpciones.innerHTML = '';
 
-            // Si hay opciones válidas, las mostramos. Si están vacías / EMPTY, mostramos directamente el botón verde siguiente.
+            // Detectar si es un capítulo final (ID 'fin', incluye 'epilogo', o si no tiene opciones y el siguiente destino es fin/epílogo)
+            let esFinal = (idCapitulo === 'fin' || idCapitulo.includes('epilogo'));
+            if (!esFinal && opcionesValidas.length === 0) {
+                let siguienteDestino = 'cap_' + (pasoActualIndex + 2);
+                if (opcionesList && opcionesList.length > 0 && opcionesList[0].siguiente_capitulo) {
+                    siguienteDestino = opcionesList[0].siguiente_capitulo;
+                }
+                if (siguienteDestino === 'fin' || siguienteDestino.includes('epilogo')) {
+                    esFinal = true;
+                }
+            }
+
+            if (esFinal) {
+                // Mostrar el texto del capítulo final y añadir abajo las opciones de calificación, donación y compartir
+                pasoActualIndex = totalPasosHistoria - 1;
+                actualizarBarritasProgreso();
+
+                document.getElementById('hint-siguiente').style.display = 'none';
+
+                const bloqueFinal = document.createElement('div');
+                bloqueFinal.innerHTML = `
+                    <div class="rating-box" id="seccion-votacion-estrellas">
+                        <div style="font-weight: bold; font-size: 14px;">¿Qué te pareció la historia? Califícala:</div>
+                        <div class="interactive-stars" id="star-selector">
+                            <span onclick="registrarVotoEstrellas(1)">★</span><span onclick="registrarVotoEstrellas(2)">★</span><span onclick="registrarVotoEstrellas(3)">★</span><span onclick="registrarVotoEstrellas(4)">★</span><span onclick="registrarVotoEstrellas(5)">★</span>
+                        </div>
+                    </div>
+
+                    <div class="donation-box">
+                        <div class="donation-text">
+                            Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
+                        </div>
+                        <button class="btn-channel" onclick="abrirCanalRegalos()">Enviar Regalo</button>
+                    </div>
+
+                    <button class="btn btn-share" onclick="compartirHistoria()">Compartir Historia</button>
+                `;
+                contenedorOpciones.appendChild(bloqueFinal);
+                
+                mostrarOtrasHistorias();
+                return;
+            }
+
+            // Si hay opciones válidas, las mostramos. Si no hay, habilitamos el botón verde para avanzar al siguiente capítulo.
             if (opcionesValidas.length > 0) {
                 const opcionesAleatorias = barajarArreglo(opcionesValidas);
 
@@ -601,12 +607,10 @@
                     contenedorOpciones.appendChild(btn);
                 });
             } else {
-                // Caso sin opciones: Ocultar hint de selección y mostrar directamente el botón verde siguiente
                 document.getElementById('hint-siguiente').style.display = 'none';
                 const btnNext = document.getElementById('btn_next');
                 btnNext.style.display = 'block';
                 
-                // Si la tabla opciones tiene el registro 'EMPTY' con el siguiente_capitulo configurado, lo usamos; de lo contrario avanzamos por defecto
                 let siguienteDestino = 'cap_' + (pasoActualIndex + 2);
                 if (opcionesList && opcionesList.length > 0 && opcionesList[0].siguiente_capitulo) {
                     siguienteDestino = opcionesList[0].siguiente_capitulo;
