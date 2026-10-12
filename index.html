@@ -174,6 +174,7 @@
             display: flex;
             flex-direction: column;
             gap: 2px;
+            text-align: left;
         }
         .story-card:hover {
             background: #e9ecef;
@@ -473,7 +474,7 @@
                         <button class="btn-channel" onclick="abrirCanalRegalos()">Enviar Regalo</button>
                     </div>
 
-                    <button class="btn btn-share" onclick="compartirHistoria()">Compartir Historia ↗</button>
+                    <button class="btn btn-share" onclick="compartirHistoria()">Compartir Historia</button>
                 `;
                 
                 document.getElementById('opciones-container').innerHTML = '';
@@ -521,12 +522,12 @@
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
 
             const tituloObra = document.getElementById('story-title-author').innerText;
-            const botUsername = 'BetaReadsBot'; // Reemplaza esto si tu nuevo bot tiene otro nombre de usuario exacto en BotFather
+            const botUsername = 'BetaReadsBot'; // Asegúrate de que coincida con el nombre de usuario de tu bot en BotFather
             
-            // Enlace especial de Telegram nativo para abrir directo la Mini App con la historia
+            // Enlace inteligente nativo de Telegram para abrir directo la Mini App con la historia
             const linkDirectoApp = `https://t.me/${botUsername}/app?startapp=${historiaActualId}`;
 
-            // Abre el selector de Telegram para compartir utilizando la URL nativa directa
+            // Prepara el texto para compartir ocultando la URL larga bajo el nombre de la historia
             const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(linkDirectoApp)}&text=${encodeURIComponent(`¡Lee "${tituloObra}" en Beta Reads! 📖✨`)}`;
 
             if (tg && typeof tg.openTelegramLink === 'function') {
