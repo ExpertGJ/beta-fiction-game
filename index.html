@@ -282,7 +282,7 @@
         }
 
         function obtenerIndicePorIdCapitulo(idCap) {
-            if (idCap === 'fin') return totalPasosHistoria - 1;
+            if (idCap === 'fin' || idCap.includes('epilogo')) return totalPasosHistoria - 1;
             const match = idCap.match(/\d+/);
             if (match) {
                 const num = parseInt(match[0], 10);
@@ -409,33 +409,21 @@
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
             actualizarBarritasProgreso();
 
-            const { data: capituloData, error } = await supabaseClient
-                .from('capitulos')
-                .select('*')
-                .eq('historia_id', historiaActualId)
-                .eq('id', idCapitulo)
-                .maybeSingle();
-
             const { data: opcionesList } = await supabaseClient
                 .from('opciones')
                 .select('*')
                 .eq('historia_id', historiaActualId)
                 .eq('capitulo_id', idCapitulo);
 
-            if (error || !capituloData || idCapitulo === 'fin' || !opcionesList || opcionesList.length === 0) {
+            if (idCapitulo === 'fin' || idCapitulo.includes('epilogo') || !opcionesList || opcionesList.length === 0) {
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
 
                 document.getElementById('titulo').style.display = 'none';
                 document.getElementById('hint-siguiente').style.display = 'none';
-
-                let tituloFinal = (capituloData && capituloData.titulo) ? capituloData.titulo : 'FIN DE LA HISTORIA';
-                let textoFinal = (capituloData && capituloData.descripcion) ? capituloData.descripcion : 'Has completado la historia.';
+                document.getElementById('pregunta').innerText = '';
 
                 document.getElementById('pregunta').innerHTML = `
-                    <strong style="font-style: italic;">${tituloFinal}</strong><br><br>
-                    <p style="text-align: justify; font-size: 14px; line-height: 1.5;">${textoFinal}</p><br>
-                    
                     <div class="rating-box" id="seccion-votacion-estrellas">
                         <div style="font-weight: bold; font-size: 14px;">¿Qué te pareció la historia? Califícala:</div>
                         <div class="interactive-stars" id="star-selector">
@@ -458,6 +446,15 @@
                 return;
             }
 
+            const { data: capituloData, error } = await supabaseClient
+                .from('capitulos')
+                .select('*')
+                .eq('historia_id', historiaActualId)
+                .eq('id', idCapitulo)
+                .maybeSingle();
+
+            if (error || !capituloData) return;
+
             const elementoTitulo = document.getElementById('titulo');
             if (capituloData.titulo && capituloData.titulo.trim() !== '') {
                 elementoTitulo.innerText = capituloData.titulo;
@@ -471,19 +468,6 @@
 
             const contenedorOpciones = document.getElementById('opciones-container');
             contenedorOpciones.innerHTML = '';
-
-            if (!opcionesList || opcionesList.length === 0) {
-                document.getElementById('hint-siguiente').style.display = 'none';
-                const btnNext = document.getElementById('btn_next');
-                btnNext.style.display = 'block';
-                btnNext.onclick = () => {
-                    let siguienteCapId = `cap_${parseInt(idCapitulo.replace(/\D/g, '')) + 1}`;
-                    pasoActualIndex = obtenerIndicePorIdCapitulo(siguienteCapId);
-                    capituloActualId = siguienteCapId;
-                    cargarCapitulo(capituloActualId);
-                };
-                return;
-            }
 
             const opcionesAleatorias = barajarArreglo(opcionesList);
 
