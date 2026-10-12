@@ -378,9 +378,9 @@
 
             let nuevoIndex = currentIndex + direccion;
             if (nuevoIndex >= listaTodasHistorias.length) {
-                nuevoIndex = 0; // Vuelve al inicio si llega al final
+                nuevoIndex = 0; 
             } else if (nuevoIndex < 0) {
-                nuevoIndex = listaTodasHistorias.length - 1; // Va al final si está en el primero
+                nuevoIndex = listaTodasHistorias.length - 1; 
             }
 
             const nuevaHistoria = listaTodasHistorias[nuevoIndex];
@@ -507,6 +507,7 @@
             document.getElementById('otras-historias').style.display = 'none';
             
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
+            pasoActualIndex = obtenerIndicePorIdCapitulo(idCapitulo);
             actualizarBarritasProgreso();
 
             const { data: opcionesList } = await supabaseClient
