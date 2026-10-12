@@ -359,9 +359,11 @@
         }
 
         async function cargarListaHistoriasGlobal() {
+            // Filtra únicamente las historias que tengan estado 'publico'
             const { data } = await supabaseClient
                 .from('config_historia')
-                .select('*');
+                .select('*')
+                .eq('estado', 'publico');
             if (data) {
                 listaTodasHistorias = data;
             }
@@ -446,7 +448,6 @@
         }
 
         async function registrarVotoEstrellas(calificacion) {
-            // 1. Consultar si ya existe el registro para esta historia específica
             const { data: actual } = await supabaseClient
                 .from('promedios_globales')
                 .select('*')
@@ -456,7 +457,6 @@
             let errorAccion = null;
 
             if (actual) {
-                // Si ya existe, actualizamos sumando el nuevo voto
                 let nuevoTotalVotos = (actual.total_votos_estrellas || 0) + 1;
                 let nuevaSumaEstrellas = (actual.suma_estrellas || 0) + calificacion;
 
@@ -469,7 +469,6 @@
                     .eq('historia_id', historiaActualId);
                 errorAccion = error;
             } else {
-                // Si no existe, insertamos la primera fila para esta historia
                 const { error } = await supabaseClient
                     .from('promedios_globales')
                     .insert([{
@@ -512,10 +511,11 @@
             verificarParametroHistoria();
             await cargarListaHistoriasGlobal();
 
+            // Cargar por defecto la primera historia que esté pública
             const { data: historiaActiva } = await supabaseClient
                 .from('config_historia')
                 .select('*')
-                .eq('activa', true)
+                .eq('estado', 'publico')
                 .limit(1)
                 .maybeSingle();
 
@@ -547,10 +547,8 @@
                 .eq('historia_id', historiaActualId)
                 .eq('capitulo_id', idCapitulo);
 
-            // Filtrar opciones válidas o EMPTY
             const opcionesValidas = opcionesList ? opcionesList.filter(o => o.texto_opcion && o.texto_opcion.trim() !== '' && o.texto_opcion.trim() !== 'EMPTY') : [];
 
-            // Consultar los datos del capítulo actual (título y descripción)
             const { data: capituloData, error } = await supabaseClient
                 .from('capitulos')
                 .select('*')
@@ -574,7 +572,6 @@
             const contenedorOpciones = document.getElementById('opciones-container');
             contenedorOpciones.innerHTML = '';
 
-            // Detectar si es un capítulo final (ID 'fin', incluye 'epilogo', o si no tiene opciones y el siguiente destino es fin/epílogo)
             let esFinal = (idCapitulo === 'fin' || idCapitulo.includes('epilogo'));
             if (!esFinal && opcionesValidas.length === 0) {
                 let siguienteDestino = 'cap_' + (pasoActualIndex + 2);
@@ -587,7 +584,6 @@
             }
 
             if (esFinal) {
-                // Mostrar el texto del capítulo final y ordenar los elementos: Calificación -> Botón Compartir -> Donación
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
 
@@ -617,7 +613,6 @@
                 return;
             }
 
-            // Si hay opciones válidas, las mostramos. Si no hay, habilitamos el botón verde para avanzar al siguiente capítulo.
             if (opcionesValidas.length > 0) {
                 const opcionesAleatorias = barajarArreglo(opcionesValidas);
 
