@@ -30,10 +30,30 @@
             border-radius: 12px;
             font-size: 13px;
             display: flex;
+            align-items: center;
+            justify-content: space-between;
+            text-align: center;
+        }
+        .stats-center {
+            display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
-            text-align: center;
+            gap: 4px;
+            flex: 1;
+        }
+        .nav-arrow {
+            background: none;
+            border: none;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--tg-theme-text-color, #2481cc);
+            cursor: pointer;
+            padding: 0 8px;
+            user-select: none;
+            transition: opacity 0.2s;
+        }
+        .nav-arrow:hover {
+            opacity: 0.7;
         }
         .story-author-header {
             font-size: 18px;
@@ -235,15 +255,19 @@
 <body>
 
     <div class="container" id="app">
-        <!-- Panel Superior: Título de la obra, estrellas promedio y autor -->
+        <!-- Panel Superior: Flecha anterior, Título/Estrellas/Autor y Flecha siguiente -->
         <div class="stats-box" id="stats-panel">
-            <div id="story-title-author" class="story-author-header">Cargando historia...</div>
-            <div class="stars-container">
-                <span id="avg-rating-num">0.0</span>
-                <span class="stars-display" id="avg-stars-icon">★★★★★</span>
-                <span id="total-ratings-count">(0)</span>
+            <button class="nav-arrow" onclick="cambiarHistoriaAdyacente(-1)">&#10094;</button>
+            <div class="stats-center">
+                <div id="story-title-author" class="story-author-header">Cargando historia...</div>
+                <div class="stars-container">
+                    <span id="avg-rating-num">0.0</span>
+                    <span class="stars-display" id="avg-stars-icon">★★★★★</span>
+                    <span id="total-ratings-count">(0)</span>
+                </div>
+                <div id="story-author-name" class="author-name">Autor: Cargando...</div>
             </div>
-            <div id="story-author-name" class="author-name">Autor: Cargando...</div>
+            <button class="nav-arrow" onclick="cambiarHistoriaAdyacente(1)">&#10095;</button>
         </div>
 
         <!-- Imagen de la escena -->
@@ -288,6 +312,7 @@
         let totalPasosHistoria = 3; 
         let pasoActualIndex = 0; 
         let autorActualNombre = '';
+        let listaTodasHistorias = [];
 
         function verificarParametroHistoria() {
             const params = new URLSearchParams(window.location.search);
@@ -331,6 +356,44 @@
             }
             
             contenedor.innerHTML = htmlBarritas;
+        }
+
+        async function cargarListaHistoriasGlobal() {
+            const { data } = await supabaseClient
+                .from('config_historia')
+                .select('*');
+            if (data) {
+                listaTodasHistorias = data;
+            }
+        }
+
+        async function cambiarHistoriaAdyacente(direccion) {
+            if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
+                await cargarListaHistoriasGlobal();
+            }
+            if (!listaTodasHistorias || listaTodasHistorias.length === 0) return;
+
+            let currentIndex = listaTodasHistorias.findIndex(h => h.historia_id === historiaActualId);
+            if (currentIndex === -1) currentIndex = 0;
+
+            let nuevoIndex = currentIndex + direccion;
+            if (nuevoIndex >= listaTodasHistorias.length) {
+                nuevoIndex = 0; // Vuelve al inicio si llega al final
+            } else if (nuevoIndex < 0) {
+                nuevoIndex = listaTodasHistorias.length - 1; // Va al final si está en el primero
+            }
+
+            const nuevaHistoria = listaTodasHistorias[nuevoIndex];
+            historiaActualId = nuevaHistoria.historia_id;
+            capituloActualId = 'cap_1';
+            pasoActualIndex = 0;
+            document.getElementById('progress-bars-container').style.display = 'flex';
+
+            if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+
+            await cargarConfiguracionHistoria(historiaActualId);
+            await actualizarEstadisticasComunidad();
+            cargarCapitulo(capituloActualId);
         }
 
         async function cargarConfiguracionHistoria(hId) {
@@ -417,6 +480,7 @@
             }
 
             verificarParametroHistoria();
+            await cargarListaHistoriasGlobal();
 
             const { data: historiaActiva } = await supabaseClient
                 .from('config_historia')
@@ -522,12 +586,9 @@
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
 
             const tituloObra = document.getElementById('story-title-author').innerText;
-            const botUsername = 'BetaReadsBot'; // Asegúrate de que coincida con el nombre exacto de tu bot en BotFather
+            const botUsername = 'BetaReadsBot'; 
             
-            // Enlace directo oficial de Telegram para abrir la Web App de inmediato con la historia (startapp)
             const linkDirectoApp = `https://t.me/${botUsername}?startapp=${historiaActualId}`;
-
-            // Prepara el texto con el enlace formateado limpio para compartir
             const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(linkDirectoApp)}&text=${encodeURIComponent(`¡Lee "${tituloObra}" en Beta Reads! 📖✨`)}`;
 
             if (tg && typeof tg.openTelegramLink === 'function') {
@@ -567,16 +628,16 @@
         }
 
         async function mostrarOtrasHistorias() {
-            const { data: lista } = await supabaseClient
-                .from('config_historia')
-                .select('*');
+            if (!listaTodasHistorias || listaTodasHistorias.length <= 1) {
+                await cargarListaHistoriasGlobal();
+            }
 
-            if (!lista || lista.length <= 1) return;
+            if (!listaTodasHistorias || listaTodasHistorias.length <= 1) return;
 
             const contenedorLista = document.getElementById('lista-historias');
             contenedorLista.innerHTML = '';
 
-            lista.forEach(h => {
+            listaTodasHistorias.forEach(h => {
                 if (h.historia_id !== historiaActualId) {
                     const card = document.createElement('div');
                     card.className = 'story-card';
