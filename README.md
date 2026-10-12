@@ -1,1 +1,1 @@
-# beta-fiction-game
+# beta-reads-game
