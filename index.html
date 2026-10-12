@@ -397,7 +397,6 @@
         }
 
         async function cargarConfiguracionHistoria(hId) {
-            // El código verifica y cuenta de forma automática los capítulos reales en la tabla 'capitulos'
             const { count, error } = await supabaseClient
                 .from('capitulos')
                 .select('*', { count: 'exact', head: true })
@@ -562,7 +561,7 @@
                 .from('capitulos')
                 .select('*')
                 .eq('historia_id', historiaActualId)
-                .eq('id', idCapitulo)
+                .eq('capitulo_id', idCapitulo)
                 .maybeSingle();
 
             if (error || !capituloData) return;
