@@ -524,13 +524,11 @@
             const tituloObra = document.getElementById('story-title-author').innerText;
             const botUsername = 'BetaReadsBot'; // Asegúrate de que coincida con el nombre exacto de tu bot en BotFather
             
-            // Enlace directo inteligente de Telegram para abrir la Mini App con la historia
+            // Enlace directo oficial de Telegram para abrir la Web App de inmediato con la historia (startapp)
             const linkDirectoApp = `https://t.me/${botUsername}?startapp=${historiaActualId}`;
 
-            // Estructura de texto elegante usando el nombre de la historia como texto descriptivo del enlace nativo
-            const textoMensaje = `¡Lee "${tituloObra}" en Beta Reads! 📖✨`;
-
-            const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(linkDirectoApp)}&text=${encodeURIComponent(textoMensaje)}`;
+            // Prepara el texto con el enlace formateado limpio para compartir
+            const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(linkDirectoApp)}&text=${encodeURIComponent(`¡Lee "${tituloObra}" en Beta Reads! 📖✨`)}`;
 
             if (tg && typeof tg.openTelegramLink === 'function') {
                 tg.openTelegramLink(urlTelegramShare);
