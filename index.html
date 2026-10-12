@@ -222,7 +222,7 @@
             padding: 14px;
             border-radius: 12px;
             text-align: center;
-            margin-top: 14px;
+            margin-top: 10px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -248,7 +248,7 @@
         }
         .btn-share {
             background-color: #17a2b8;
-            margin-top: 6px;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -565,7 +565,7 @@
             }
 
             if (esFinal) {
-                // Mostrar el texto del capítulo final y añadir abajo las opciones de calificación, donación y compartir
+                // Mostrar el texto del capítulo final y ordenar los elementos: Calificación -> Botón Compartir -> Donación
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
 
@@ -580,14 +580,14 @@
                         </div>
                     </div>
 
+                    <button class="btn btn-share" onclick="compartirHistoria()">Compartir Historia</button>
+
                     <div class="donation-box">
                         <div class="donation-text">
                             Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
                         </div>
                         <button class="btn-channel" onclick="abrirCanalRegalos()">Enviar Regalo</button>
                     </div>
-
-                    <button class="btn btn-share" onclick="compartirHistoria()">Compartir Historia</button>
                 `;
                 contenedorOpciones.appendChild(bloqueFinal);
                 
