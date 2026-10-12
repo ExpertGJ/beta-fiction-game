@@ -307,7 +307,7 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        let historiaActualId = 'mansion_misterio';
+        let historiaActualId = '';
         let capituloActualId = 'cap_1';
         let totalPasosHistoria = 3; 
         let pasoActualIndex = 0; 
@@ -359,7 +359,6 @@
         }
 
         async function cargarListaHistoriasGlobal() {
-            // Filtra únicamente las historias que tengan estado 'publico'
             const { data } = await supabaseClient
                 .from('config_historia')
                 .select('*')
@@ -511,7 +510,12 @@
             verificarParametroHistoria();
             await cargarListaHistoriasGlobal();
 
-            // Cargar por defecto la primera historia que esté pública
+            // Si no hay ninguna historia pública disponible, ocultamos el contenido principal
+            if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
+                document.getElementById('app').innerHTML = '';
+                return;
+            }
+
             const { data: historiaActiva } = await supabaseClient
                 .from('config_historia')
                 .select('*')
