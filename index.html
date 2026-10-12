@@ -291,7 +291,7 @@
 
         function verificarParametroHistoria() {
             const params = new URLSearchParams(window.location.search);
-            let historiaParam = params.get('historia');
+            let historiaParam = params.get('historia') || params.get('startapp');
             
             if (!historiaParam && tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
                 historiaParam = tg.initDataUnsafe.start_param;
@@ -406,7 +406,7 @@
             const params = new URLSearchParams(window.location.search);
             const startParam = tg.initDataUnsafe?.start_param;
             
-            if ((!telegramUser || !telegramUser.id) && !params.get('historia') && !startParam) {
+            if ((!telegramUser || !telegramUser.id) && !params.get('historia') && !params.get('startapp') && !startParam) {
                 document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
                         <h3>Acceso Restringido</h3>
@@ -425,7 +425,7 @@
                 .limit(1)
                 .maybeSingle();
 
-            if (!params.get('historia') && !startParam && historiaActiva) {
+            if (!params.get('historia') && !params.get('startapp') && !startParam && historiaActiva) {
                 historiaActualId = historiaActiva.historia_id;
             }
 
@@ -522,12 +522,12 @@
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
 
             const tituloObra = document.getElementById('story-title-author').innerText;
-            const botUsername = 'BetaReadsBot'; // Asegúrate de que coincida con el nombre de usuario de tu bot en BotFather
+            const botUsername = 'BetaReadsBot'; // Asegúrate de que coincida con el nombre exacto de tu bot en BotFather
             
-            // Enlace inteligente nativo de Telegram para abrir directo la Mini App con la historia
-            const linkDirectoApp = `https://t.me/${botUsername}/app?startapp=${historiaActualId}`;
+            // Enlace directo oficial de Telegram para abrir la Web App de inmediato con la historia (startapp)
+            const linkDirectoApp = `https://t.me/${botUsername}?startapp=${historiaActualId}`;
 
-            // Prepara el texto para compartir ocultando la URL larga bajo el nombre de la historia
+            // Prepara el texto con el enlace formateado limpio para compartir
             const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(linkDirectoApp)}&text=${encodeURIComponent(`¡Lee "${tituloObra}" en Beta Reads! 📖✨`)}`;
 
             if (tg && typeof tg.openTelegramLink === 'function') {
