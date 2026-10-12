@@ -171,11 +171,22 @@
             border-radius: 8px;
             margin-top: 8px;
             cursor: pointer;
-            font-weight: bold;
-            color: #2481cc;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
         }
         .story-card:hover {
             background: #e9ecef;
+        }
+        .story-card-title {
+            font-weight: bold;
+            color: #2481cc;
+            font-size: 15px;
+        }
+        .story-card-author {
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
         }
         .blocked-card {
             background: #fff3cd;
@@ -213,6 +224,9 @@
             font-weight: bold;
             cursor: pointer;
             box-shadow: 0 2px 6px rgba(36, 129, 204, 0.35);
+        }
+        .btn-share {
+            background-color: #17a2b8;
         }
     </style>
 </head>
@@ -258,7 +272,7 @@
 
     <script>
         const SUPABASE_URL = 'https://cnhtbdzzcfvrdkqzrfjf.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuaHRiZHp6Y2Z2cmRrcXpyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDUzMTcsImV4cCI6MjEwNzIyMTMxN30.nBKNHG4ArcWkctm8n-rF592wZ2Aa7MG4fS-qswboWD0';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuaHRiZHp6Y2Z2cmRrcXpyZmpmIiwicm9sZSI6ImFub24iOjE3OTE2NDUzMTcsImV4cCI6MjEwNzIyMTMxN30.nBKNHG4ArcWkctm8n-rF592wZ2Aa7MG4fS-qswboWD0';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: { persistSession: false }
@@ -271,6 +285,16 @@
         let capituloActualId = 'cap_1';
         let totalPasosHistoria = 3; 
         let pasoActualIndex = 0; 
+        let autorActualNombre = '';
+
+        // Al iniciar, verifica si viene una historia específica por parámetro en el URL (ej: ?historia=apocalipsis_zombie)
+        function verificarParametroHistoria() {
+            const params = new URLSearchParams(window.location.search);
+            const historiaParam = params.get('historia');
+            if (historiaParam) {
+                historiaActualId = historiaParam;
+            }
+        }
 
         function barajarArreglo(array) {
             let arr = [...array];
@@ -312,8 +336,9 @@
 
             if (data) {
                 totalPasosHistoria = data.total_pasos || 3;
+                autorActualNombre = data.autor || 'Desconocido';
                 document.getElementById('story-title-author').innerText = data.titulo_historia;
-                document.getElementById('story-author-name').innerText = `Autor: ${data.autor || 'Desconocido'}`;
+                document.getElementById('story-author-name').innerText = `Autor: ${autorActualNombre}`;
             }
         }
 
@@ -376,11 +401,13 @@
                 document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
                         <h3>Acceso Restringido</h3>
-                        <p>Abre esta Mini App directamente desde Telegram.</p>
+                        <p>Abre esta Mini App directamente desde Telegram para jugar.</p>
                     </div>
                 `;
                 return;
             }
+
+            verificarParametroHistoria();
 
             const { data: historiaActiva } = await supabaseClient
                 .from('config_historia')
@@ -389,7 +416,7 @@
                 .limit(1)
                 .maybeSingle();
 
-            if (historiaActiva) {
+            if (!window.location.search.includes('historia=') && historiaActiva) {
                 historiaActualId = historiaActiva.historia_id;
             }
 
@@ -433,8 +460,9 @@
 
                     <div class="donation-box">
                         <div class="donation-text">
-                            Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
+                            ¿Te gustó esta lectura? Compártela con tus amigos o apóyanos enviando un regalo a nuestro canal.
                         </div>
+                        <button class="btn btn-share" onclick="compartirHistoria()">Compartir Historia ↗</button>
                         <button class="btn-channel" onclick="abrirCanalRegalos()">Enviar Regalo</button>
                     </div>
                 `;
@@ -480,6 +508,25 @@
             });
         }
 
+        function compartirHistoria() {
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+
+            const tituloObra = document.getElementById('story-title-author').innerText;
+            const baseUrl = window.location.href.split('?')[0];
+            const linkEspecifico = `${baseUrl}?historia=${historiaActualId}`;
+            const textoCompartir = `¡Lee "${tituloObra}" escrita por ${autorActualNombre} en Beta Reads! 📖✨ Pruébala aquí: ${linkEspecifico}`;
+
+            if (tg && typeof tg.openTelegramLink === 'function') {
+                // Abre el selector nativo de Telegram para reenviar a chats o canales
+                const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(linkEspecifico)}&text=${encodeURIComponent(`¡Lee "${tituloObra}" en Beta Reads! 📖`)}`;
+                tg.openTelegramLink(urlTelegramShare);
+            } else {
+                navigator.clipboard.writeText(linkEspecifico).then(() => {
+                    alert('¡Enlace de la historia copiado al portapapeles!');
+                });
+            }
+        }
+
         function abrirCanalRegalos() {
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             
@@ -523,7 +570,10 @@
                 if (h.historia_id !== historiaActualId) {
                     const card = document.createElement('div');
                     card.className = 'story-card';
-                    card.innerText = h.titulo_historia;
+                    card.innerHTML = `
+                        <div class="story-card-title">${h.titulo_historia}</div>
+                        <div class="story-card-author">Autor: ${h.autor || 'Desconocido'}</div>
+                    `;
                     card.onclick = async () => {
                         historiaActualId = h.historia_id;
                         capituloActualId = 'cap_1';
