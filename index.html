@@ -26,33 +26,64 @@
         }
         .stats-box {
             background: rgba(0,0,0,0.04);
-            padding: 10px;
-            border-radius: 10px;
-            font-size: 12px;
-            font-weight: 600;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 13px;
             display: flex;
             flex-direction: column;
+            align-items: center;
             gap: 6px;
             text-align: center;
         }
         .story-author-header {
-            font-size: 14px;
+            font-size: 18px;
             font-weight: bold;
             font-style: italic;
             color: var(--tg-theme-text-color, #000000);
-            border-bottom: 1px solid rgba(0,0,0,0.08);
-            padding-bottom: 4px;
         }
-        .community-header {
-            font-size: 11px;
+        .author-name {
+            font-size: 13px;
             color: #666;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            margin-top: 2px;
         }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+        .stars-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             gap: 4px;
+            font-size: 15px;
+            font-weight: bold;
+        }
+        .stars-display {
+            color: #ffc107;
+            font-size: 16px;
+            letter-spacing: 2px;
+        }
+        .rating-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .interactive-stars {
+            font-size: 28px;
+            color: #ccc;
+            cursor: pointer;
+            letter-spacing: 4px;
+            user-select: none;
+        }
+        .interactive-stars span {
+            transition: color 0.2s;
+        }
+        .interactive-stars span:hover,
+        .interactive-stars span.active {
+            color: #ffc107;
         }
         img {
             width: 100%;
@@ -188,16 +219,15 @@
 <body>
 
     <div class="container" id="app">
-        <!-- Panel Superior: Título y Promedios Comunitarios -->
+        <!-- Panel Superior: Título de la obra, estrellas promedio y autor -->
         <div class="stats-box" id="stats-panel">
             <div id="story-title-author" class="story-author-header">Cargando historia...</div>
-            <div class="community-header">Promedio Global de la Comunidad</div>
-            <div class="stats-grid">
-                <div><span id="lbl-attr1">Attr 1</span>: <span id="comm-attr1">50</span>%</div>
-                <div><span id="lbl-attr2">Attr 2</span>: <span id="comm-attr2">50</span>%</div>
-                <div><span id="lbl-attr3">Attr 3</span>: <span id="comm-attr3">50</span>%</div>
-                <div><span id="lbl-attr4">Attr 4</span>: <span id="comm-attr4">50</span>%</div>
+            <div class="stars-container">
+                <span id="avg-rating-num">0.0</span>
+                <span class="stars-display" id="avg-stars-icon">★★★★★</span>
+                <span id="total-ratings-count">(0)</span>
             </div>
+            <div id="story-author-name" class="author-name">Autor: Cargando...</div>
         </div>
 
         <!-- Imagen de la escena -->
@@ -305,12 +335,8 @@
                 nombresAtributos.attr4 = data.attr_4_nombre;
                 totalPasosHistoria = data.total_pasos || 3;
 
-                document.getElementById('lbl-attr1').innerText = data.attr_1_nombre;
-                document.getElementById('lbl-attr2').innerText = data.attr_2_nombre;
-                document.getElementById('lbl-attr3').innerText = data.attr_3_nombre;
-                document.getElementById('lbl-attr4').innerText = data.attr_4_nombre;
-
                 document.getElementById('story-title-author').innerText = data.titulo_historia;
+                document.getElementById('story-author-name').innerText = `Autor: ${data.autor || 'Desconocido'}`;
             }
         }
 
@@ -321,24 +347,37 @@
                 .eq('historia_id', historiaActualId)
                 .maybeSingle();
 
-            if (error || !data || !data.total_partidas || data.total_partidas <= 0) {
+            if (error || !data) {
+                document.getElementById('avg-rating-num').innerText = '0.0';
+                document.getElementById('avg-stars-icon').innerText = '☆☆☆☆☆';
+                document.getElementById('total-ratings-count').innerText = '(0)';
                 return;
             }
 
-            document.getElementById('comm-attr1').innerText = Math.round(data.attr1_acum / data.total_partidas);
-            document.getElementById('comm-attr2').innerText = Math.round(data.attr2_acum / data.total_partidas);
-            document.getElementById('comm-attr3').innerText = Math.round(data.attr3_acum / data.total_partidas);
-            document.getElementById('comm-attr4').innerText = Math.round(data.attr4_acum / data.total_partidas);
+            let totalVotos = data.total_votos_estrellas || 0;
+            let sumaEstrellas = data.suma_estrellas || 0;
+            let promedio = totalVotos > 0 ? (sumaEstrellas / totalVotos).toFixed(1) : '0.0';
+
+            document.getElementById('avg-rating-num').innerText = promedio;
+            document.getElementById('total-ratings-count').innerText = `(${totalVotos})`;
+
+            // Generar estrellas dinámicas (rellenas ★ y vacías ☆)
+            let numEstrellasEnteras = Math.round(parseFloat(promedio));
+            let estrellasStr = '★'.repeat(numEstrellasEnteras) + '☆'.repeat(5 - numEstrellasEnteras);
+            document.getElementById('avg-stars-icon').innerText = estrellasStr;
         }
 
-        async function registrarPuntajeFinalComunidad() {
+        async function registrarVotoEstrellas(calificacion) {
             const { data: actual } = await supabaseClient
                 .from('promedios_globales')
                 .select('*')
                 .eq('historia_id', historiaActualId)
                 .maybeSingle();
 
-            let nuevoTotal = (actual && actual.total_partidas) ? actual.total_partidas + 1 : 1;
+            let nuevoTotalVotos = (actual && actual.total_votos_estrellas) ? actual.total_votos_estrellas + 1 : 1;
+            let nuevaSumaEstrellas = (actual && actual.suma_estrellas) ? actual.suma_estrellas + calificacion : calificacion;
+
+            let nuevoTotalPartidas = (actual && actual.total_partidas) ? actual.total_partidas + 1 : 1;
             let nuevo1 = (actual && actual.attr1_acum) ? actual.attr1_acum + jugador.attr1 : jugador.attr1;
             let nuevo2 = (actual && actual.attr2_acum) ? actual.attr2_acum + jugador.attr2 : jugador.attr2;
             let nuevo3 = (actual && actual.attr3_acum) ? actual.attr3_acum + jugador.attr3 : jugador.attr3;
@@ -348,12 +387,22 @@
                 .from('promedios_globales')
                 .upsert({
                     historia_id: historiaActualId,
-                    total_partidas: nuevoTotal,
+                    total_partidas: nuevoTotalPartidas,
                     attr1_acum: nuevo1,
                     attr2_acum: nuevo2,
                     attr3_acum: nuevo3,
-                    attr4_acum: nuevo4
+                    attr4_acum: nuevo4,
+                    total_votos_estrellas: nuevoTotalVotos,
+                    suma_estrellas: nuevaSumaEstrellas
                 }, { onConflict: 'historia_id' });
+
+            if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+            
+            const contenedorVoto = document.getElementById('seccion-votacion-estrellas');
+            if (contenedorVoto) {
+                contenedorVoto.innerHTML = `<div style="font-weight: bold; color: #28a745; padding: 10px;">¡Gracias por tu voto de ${calificacion} estrellas! ⭐</div>`;
+            }
+            await actualizarEstadisticasComunidad();
         }
 
         async function iniciarApp() {
@@ -412,9 +461,6 @@
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
 
-                await registrarPuntajeFinalComunidad();
-                await actualizarEstadisticasComunidad();
-
                 document.getElementById('titulo').style.display = 'none';
                 document.getElementById('hint-siguiente').style.display = 'none';
 
@@ -445,6 +491,13 @@
                     ${nombresAtributos.attr1}: ${jugador.attr1}% | ${nombresAtributos.attr2}: ${jugador.attr2}%<br>
                     ${nombresAtributos.attr3}: ${jugador.attr3}% | ${nombresAtributos.attr4}: ${jugador.attr4}%
                     
+                    <div class="rating-box" id="seccion-votacion-estrellas">
+                        <div style="font-weight: bold; font-size: 14px;">¿Qué te pareció la historia? Califícala:</div>
+                        <div class="interactive-stars" id="star-selector">
+                            <span onclick="registrarVotoEstrellas(1)">★</span><span onclick="registrarVotoEstrellas(2)">★</span><span onclick="registrarVotoEstrellas(3)">★</span><span onclick="registrarVotoEstrellas(4)">★</span><span onclick="registrarVotoEstrellas(5)">★</span>
+                        </div>
+                    </div>
+
                     <div class="donation-box">
                         <div class="donation-text">
                             Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
