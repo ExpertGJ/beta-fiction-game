@@ -446,22 +446,44 @@
         }
 
         async function registrarVotoEstrellas(calificacion) {
+            // 1. Consultar si ya existe el registro para esta historia específica
             const { data: actual } = await supabaseClient
                 .from('promedios_globales')
                 .select('*')
                 .eq('historia_id', historiaActualId)
                 .maybeSingle();
 
-            let nuevoTotalVotos = (actual && actual.total_votos_estrellas) ? actual.total_votos_estrellas + 1 : 1;
-            let nuevaSumaEstrellas = (actual && actual.suma_estrellas) ? actual.suma_estrellas + calificacion : calificacion;
+            let errorAccion = null;
 
-            await supabaseClient
-                .from('promedios_globales')
-                .upsert({
-                    historia_id: historiaActualId,
-                    total_votos_estrellas: nuevoTotalVotos,
-                    suma_estrellas: nuevaSumaEstrellas
-                }, { onConflict: 'historia_id' });
+            if (actual) {
+                // Si ya existe, actualizamos sumando el nuevo voto
+                let nuevoTotalVotos = (actual.total_votos_estrellas || 0) + 1;
+                let nuevaSumaEstrellas = (actual.suma_estrellas || 0) + calificacion;
+
+                const { error } = await supabaseClient
+                    .from('promedios_globales')
+                    .update({
+                        total_votos_estrellas: nuevoTotalVotos,
+                        suma_estrellas: nuevaSumaEstrellas
+                    })
+                    .eq('historia_id', historiaActualId);
+                errorAccion = error;
+            } else {
+                // Si no existe, insertamos la primera fila para esta historia
+                const { error } = await supabaseClient
+                    .from('promedios_globales')
+                    .insert([{
+                        historia_id: historiaActualId,
+                        total_votos_estrellas: 1,
+                        suma_estrellas: calificacion
+                    }]);
+                errorAccion = error;
+            }
+
+            if (errorAccion) {
+                console.error("Error al registrar voto:", errorAccion);
+                return;
+            }
 
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             
