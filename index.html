@@ -527,11 +527,8 @@
             // Enlace directo oficial de Telegram para abrir la Web App de inmediato con la historia (startapp)
             const linkDirectoApp = `https://t.me/${botUsername}?startapp=${historiaActualId}`;
 
-            // Al pasar la URL y usar el formato de enlace Markdown integrado en el texto de Telegram, 
-            // el título de la historia se convierte en el hipervínculo en azul limpio sin mostrar la URL larga.
-            const textoMensaje = `¡Lee [${tituloObra}](${linkDirectoApp}) en Beta Reads! 📖✨`;
-
-            const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(linkDirectoApp)}&text=${encodeURIComponent(textoMensaje)}`;
+            // Prepara el texto con el enlace formateado limpio para compartir
+            const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(linkDirectoApp)}&text=${encodeURIComponent(`¡Lee "${tituloObra}" en Beta Reads! 📖✨`)}`;
 
             if (tg && typeof tg.openTelegramLink === 'function') {
                 tg.openTelegramLink(urlTelegramShare);
