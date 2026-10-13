@@ -270,6 +270,14 @@
             <button class="nav-arrow" onclick="cambiarHistoriaAdyacente(1)">&#10095;</button>
         </div>
 
+        <!-- Reproductor de Música Ambiental Aleatoria -->
+        <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin: 5px 0;">
+            <audio id="bg-music" loop preload="none"></audio>
+            <button class="btn" style="padding: 10px 14px; font-size: 13px; width: auto; border-radius: 8px;" onclick="toggleMusicaAleatoria()">
+                🎵 <span id="music-text">Música Ambiental: Off</span>
+            </button>
+        </div>
+
         <!-- Imagen de la escena -->
         <img id="imagen" alt="Escena" referrerpolicy="no-referrer">
         
@@ -313,6 +321,38 @@
         let pasoActualIndex = 0; 
         let autorActualNombre = '';
         let listaTodasHistorias = [];
+
+        // Lista de canciones alojadas en tu carpeta "audio/" de GitHub.
+        // Aquí puedes ir añadiendo más archivos conforme los vayas subiendo.
+        const listaMusica = [
+            "audio/leberch-reading-books-590361.mp3"
+        ];
+        let cancionSeleccionada = false;
+
+        function toggleMusicaAleatoria() {
+            const audio = document.getElementById('bg-music');
+            const text = document.getElementById('music-text');
+            
+            if (audio.paused) {
+                if (!cancionSeleccionada && listaMusica.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * listaMusica.length);
+                    audio.src = listaMusica[randomIndex];
+                    audio.load();
+                    cancionSeleccionada = true;
+                }
+
+                audio.play().then(() => {
+                    text.innerText = "Música Ambiental: On";
+                    if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                }).catch(err => {
+                    console.log("Error al reproducir audio:", err);
+                });
+            } else {
+                audio.pause();
+                text.innerText = "Música Ambiental: Off";
+                if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+            }
+        }
 
         function verificarParametroHistoria() {
             const params = new URLSearchParams(window.location.search);
@@ -359,7 +399,6 @@
         }
 
         async function cargarListaHistoriasGlobal() {
-            // Filtra únicamente las públicas y las ordena de la más nueva a la más antigua
             const { data } = await supabaseClient
                 .from('config_historia')
                 .select('*')
@@ -512,7 +551,6 @@
             verificarParametroHistoria();
             await cargarListaHistoriasGlobal();
 
-            // Si no hay ninguna historia pública disponible, mostramos el mensaje arreglado
             if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
                 document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
@@ -523,7 +561,6 @@
                 return;
             }
 
-            // Si entra por enlace genérico, cargamos automáticamente la última historia publicada (la primera del arreglo ordenado)
             if (!params.get('historia') && !params.get('startapp') && !startParam) {
                 historiaActualId = listaTodasHistorias[0].historia_id;
             }
