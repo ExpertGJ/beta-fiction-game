@@ -338,7 +338,7 @@
         let autorActualNombre = '';
         let listaTodasHistorias = [];
 
-        // Lista completa de canciones ubicadas en tu carpeta "audio/" de GitHub
+        // Lista completa de canciones en orden fijo
         const listaMusica = [
             "audio/11145955-mesa-10550.mp3",
             "audio/40173586-magic-forest-473582.mp3",
@@ -351,17 +351,18 @@
             "audio/the_mountain-suspense-cyberpunk-375986.mp3",
             "audio/theojt-dark-ambient-121126.mp3"
         ];
-        let indicePistaActual = 0;
+        
+        // Índice predeterminado para "audio/leberch-reading-books-590361.mp3"
+        let indicePistaActual = listaMusica.indexOf("audio/leberch-reading-books-590361.mp3");
+        if (indicePistaActual === -1) indicePistaActual = 0; // Fallback por seguridad
 
-        function reproducirPistaAleatoriaInicial() {
+        function reproducirPistaPredeterminada() {
             const audio = document.getElementById('bg-music');
             if (listaMusica.length > 0) {
-                const randomIndex = Math.floor(Math.random() * listaMusica.length);
-                indicePistaActual = randomIndex;
                 audio.src = listaMusica[indicePistaActual];
-                audio.loop = true; // Activa el bucle infinito para la canción actual
+                audio.loop = true; // Bucle infinito activado para esta canción
                 audio.load();
-                audio.play().catch(err => console.log("Error al reproducir pista:", err));
+                audio.play().catch(err => console.log("Error al reproducir pista predeterminada:", err));
             }
         }
 
@@ -386,7 +387,7 @@
             
             if (audio.paused) {
                 if (!audio.src || audio.src === "" || audio.src === window.location.href) {
-                    reproducirPistaAleatoriaInicial();
+                    reproducirPistaPredeterminada();
                 } else {
                     audio.play().catch(err => console.log("Error al reproducir audio:", err));
                 }
