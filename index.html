@@ -687,7 +687,7 @@
                         </div>
                     </div>
 
-                    <button class="btn btn-share" onclick="compartirHistoria()">Compartir Historia</button>
+                    <button class="btn btn-share" onclick="compartirReseña()">Compartir Reseña</button>
 
                     <div class="donation-box">
                         <div class="donation-text">
@@ -730,7 +730,7 @@
             }
         }
 
-        function compartirHistoria() {
+        function compartirReseña() {
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
 
             const tituloObra = document.getElementById('story-title-author').innerText;
