@@ -284,9 +284,9 @@
             <button class="nav-arrow" onclick="cambiarHistoriaAdyacente(1)">&#10095;</button>
         </div>
 
-        <!-- Reproductor de Música Ambiental Aleatoria con flechas laterales -->
+        <!-- Reproductor de Música Ambiental con bucle infinito y flechas laterales -->
         <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin: 5px 0;">
-            <audio id="bg-music" preload="none"></audio>
+            <audio id="bg-music" preload="none" loop></audio>
             <button class="music-nav-arrow" onclick="cambiarPistaManual(-1)">&#171;</button>
             <button class="btn" style="padding: 10px 14px; font-size: 13px; width: auto; border-radius: 8px;" onclick="toggleMusicaAleatoria()">
                 🎵 <span id="music-text">Música Ambiental: Off</span>
@@ -353,14 +353,15 @@
         ];
         let indicePistaActual = 0;
 
-        function reproducirSiguientePistaAleatoria() {
+        function reproducirPistaAleatoriaInicial() {
             const audio = document.getElementById('bg-music');
             if (listaMusica.length > 0) {
                 const randomIndex = Math.floor(Math.random() * listaMusica.length);
                 indicePistaActual = randomIndex;
                 audio.src = listaMusica[indicePistaActual];
+                audio.loop = true; // Activa el bucle infinito para la canción actual
                 audio.load();
-                audio.play().catch(err => console.log("Error al reproducir siguiente pista:", err));
+                audio.play().catch(err => console.log("Error al reproducir pista:", err));
             }
         }
 
@@ -371,6 +372,7 @@
 
             indicePistaActual = (indicePistaActual + direccion + listaMusica.length) % listaMusica.length;
             audio.src = listaMusica[indicePistaActual];
+            audio.loop = true; // Mantiene el bucle infinito en la nueva canción seleccionada
             audio.load();
             audio.play().then(() => {
                 text.innerText = "Música Ambiental: On";
@@ -384,14 +386,10 @@
             
             if (audio.paused) {
                 if (!audio.src || audio.src === "" || audio.src === window.location.href) {
-                    reproducirSiguientePistaAleatoria();
+                    reproducirPistaAleatoriaInicial();
                 } else {
                     audio.play().catch(err => console.log("Error al reproducir audio:", err));
                 }
-
-                audio.onended = function() {
-                    reproducirSiguientePistaAleatoria();
-                };
 
                 text.innerText = "Música Ambiental: On";
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
