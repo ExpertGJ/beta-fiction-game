@@ -359,6 +359,7 @@
         }
 
         async function cargarListaHistoriasGlobal() {
+            // Filtra únicamente las públicas y las ordena de la más nueva a la más antigua
             const { data } = await supabaseClient
                 .from('config_historia')
                 .select('*')
@@ -511,6 +512,7 @@
             verificarParametroHistoria();
             await cargarListaHistoriasGlobal();
 
+            // Si no hay ninguna historia pública disponible, mostramos el mensaje arreglado
             if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
                 document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
@@ -521,6 +523,7 @@
                 return;
             }
 
+            // Si entra por enlace genérico, cargamos automáticamente la última historia publicada (la primera del arreglo ordenado)
             if (!params.get('historia') && !params.get('startapp') && !startParam) {
                 historiaActualId = listaTodasHistorias[0].historia_id;
             }
@@ -539,9 +542,7 @@
             document.getElementById('otras-historias').style.display = 'none';
             document.getElementById('progress-bars-container').style.display = 'flex';
             
-            // Imágenes con temática oscura/misteriosa a través de Unsplash Source
-            document.getElementById('imagen').src = 'https://source.unsplash.com/random/800x400/?dark,fantasy,gothic,mystery&sig=' + Math.random();
-            
+            document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
             pasoActualIndex = obtenerIndicePorIdCapitulo(idCapitulo);
             actualizarBarritasProgreso();
 
