@@ -270,9 +270,9 @@
             <button class="nav-arrow" onclick="cambiarHistoriaAdyacente(1)">&#10095;</button>
         </div>
 
-        <!-- Reproductor de Música Ambiental Aleatoria -->
+        <!-- Reproductor de Música Ambiental Aleatoria Continuo -->
         <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin: 5px 0;">
-            <audio id="bg-music" loop preload="none"></audio>
+            <audio id="bg-music" preload="none"></audio>
             <button class="btn" style="padding: 10px 14px; font-size: 13px; width: auto; border-radius: 8px;" onclick="toggleMusicaAleatoria()">
                 🎵 <span id="music-text">Música Ambiental: Off</span>
             </button>
@@ -322,31 +322,46 @@
         let autorActualNombre = '';
         let listaTodasHistorias = [];
 
-        // Lista de canciones alojadas en tu carpeta "audio/" de GitHub.
-        // Aquí puedes ir añadiendo más archivos conforme los vayas subiendo.
+        // Lista completa de canciones ubicadas en tu carpeta "audio/" de GitHub[cite: 7]
         const listaMusica = [
-            "audio/leberch-reading-books-590361.mp3"
+            "audio/11145955-mesa-10550.mp3",
+            "audio/40173586-magic-forest-473582.mp3",
+            "audio/koto-japan-soundtrack-anime-background-japanese-aikoto-10-470649.mp3",
+            "audio/leberch-fear-525004.mp3",
+            "audio/leberch-reading-books-590361.mp3",
+            "audio/pianocafe_kumi-japanese-piano-568759.mp3",
+            "audio/the_mountain-suspense-cyberpunk-375986.mp3",
+            "audio/theojt-dark-ambient-121126.mp3"
         ];
-        let cancionSeleccionada = false;
+
+        function reproducirSiguientePistaAleatoria() {
+            const audio = document.getElementById('bg-music');
+            if (listaMusica.length > 0) {
+                const randomIndex = Math.floor(Math.random() * listaMusica.length);
+                audio.src = listaMusica[randomIndex];
+                audio.load();
+                audio.play().catch(err => console.log("Error al reproducir siguiente pista:", err));
+            }
+        }
 
         function toggleMusicaAleatoria() {
             const audio = document.getElementById('bg-music');
             const text = document.getElementById('music-text');
             
             if (audio.paused) {
-                if (!cancionSeleccionada && listaMusica.length > 0) {
-                    const randomIndex = Math.floor(Math.random() * listaMusica.length);
-                    audio.src = listaMusica[randomIndex];
-                    audio.load();
-                    cancionSeleccionada = true;
+                if (!audio.src || audio.src === "" || audio.src === window.location.href) {
+                    reproducirSiguientePistaAleatoria();
+                } else {
+                    audio.play().catch(err => console.log("Error al reproducir audio:", err));
                 }
 
-                audio.play().then(() => {
-                    text.innerText = "Música Ambiental: On";
-                    if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                }).catch(err => {
-                    console.log("Error al reproducir audio:", err);
-                });
+                // Cuando una canción termine, salta automáticamente a otra al azar
+                audio.onended = function() {
+                    reproducirSiguientePistaAleatoria();
+                };
+
+                text.innerText = "Música Ambiental: On";
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             } else {
                 audio.pause();
                 text.innerText = "Música Ambiental: Off";
