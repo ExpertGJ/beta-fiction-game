@@ -198,30 +198,25 @@
             display: none;
             margin-top: 10px;
         }
-        /* Estilos minimalistas y elegantes para el buscador integrado */
+        /* Sección de Búsqueda Integrada Limpia */
         .search-section-footer {
-            margin-top: 15px;
+            margin-top: 14px;
             border-top: 1px dashed #ced4da;
             padding-top: 14px;
             display: flex;
             flex-direction: column;
             gap: 8px;
         }
-        .search-title {
-            font-weight: 600;
-            font-size: 14px;
-            color: var(--tg-theme-text-color, #333);
-            text-align: left;
-        }
         .search-input-group {
             display: flex;
-            gap: 6px;
+            gap: 8px;
+            align-items: center;
         }
         .search-input {
             flex: 1;
-            padding: 11px 12px;
+            padding: 11px 14px;
             border: 1px solid #ccc;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 14px;
             outline: none;
             background: #ffffff;
@@ -377,12 +372,11 @@
             <h3 style="margin-top: 0; font-size: 16px;">Otras historias recomendadas</h3>
             <div id="lista-historias"></div>
 
-            <!-- Buscador elegante y minimalista al final -->
+            <!-- Buscador súper limpio e intuitivo al final -->
             <div class="search-section-footer">
-                <div class="search-title">🔍 Buscar por libro o autor</div>
                 <div class="search-input-group">
-                    <input type="text" id="input-busqueda" class="search-input" placeholder="Buscar por libro o autor...">
-                    <button class="btn" style="width: auto; padding: 10px 16px; font-size: 13px; border-radius: 8px;" onclick="buscarHistoriaSupabase()">Buscar</button>
+                    <input type="text" id="input-busqueda" class="search-input" placeholder="Buscar libro o autor...">
+                    <button class="btn" style="width: auto; padding: 11px 18px; font-size: 14px; border-radius: 10px;" onclick="buscarHistoriaSupabase()">Buscar</button>
                 </div>
                 <div id="search-results" class="search-results"></div>
             </div>
