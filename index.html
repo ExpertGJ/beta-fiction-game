@@ -198,6 +198,65 @@
             display: none;
             margin-top: 10px;
         }
+        /* Estilos minimalistas y elegantes para el buscador integrado */
+        .search-section-footer {
+            margin-top: 15px;
+            border-top: 1px dashed #ced4da;
+            padding-top: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .search-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--tg-theme-text-color, #333);
+            text-align: left;
+        }
+        .search-input-group {
+            display: flex;
+            gap: 6px;
+        }
+        .search-input {
+            flex: 1;
+            padding: 11px 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            background: #ffffff;
+            color: #000;
+        }
+        .search-input::placeholder {
+            color: #888;
+            font-style: italic;
+        }
+        .search-input:focus {
+            border-color: #2481cc;
+        }
+        .search-results {
+            max-height: 180px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .search-result-item {
+            background: #ffffff;
+            border: 1px solid #e0e0e0;
+            padding: 8px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .search-result-item:hover {
+            background: #e9ecef;
+        }
         .story-card {
             background: #ffffff;
             border: 1px solid #ced4da;
@@ -313,10 +372,20 @@
 
         <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
 
-        <!-- Selector de otras historias al terminar -->
+        <!-- Selector de otras historias y Buscador al terminar -->
         <div id="otras-historias" class="stories-box">
-            <h3>Historias Disponibles</h3>
+            <h3 style="margin-top: 0; font-size: 16px;">Otras historias recomendadas</h3>
             <div id="lista-historias"></div>
+
+            <!-- Buscador elegante y minimalista al final -->
+            <div class="search-section-footer">
+                <div class="search-title">🔍 Buscar por libro o autor</div>
+                <div class="search-input-group">
+                    <input type="text" id="input-busqueda" class="search-input" placeholder="Buscar por libro o autor...">
+                    <button class="btn" style="width: auto; padding: 10px 16px; font-size: 13px; border-radius: 8px;" onclick="buscarHistoriaSupabase()">Buscar</button>
+                </div>
+                <div id="search-results" class="search-results"></div>
+            </div>
         </div>
     </div>
 
@@ -397,6 +466,61 @@
                 audio.pause();
                 text.innerText = "Música Ambiental: Off";
                 if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+            }
+        }
+
+        // Búsqueda ultraligera directa en Supabase
+        async function buscarHistoriaSupabase() {
+            const texto = document.getElementById('input-busqueda').value.trim();
+            const contenedorResultados = document.getElementById('search-results');
+            contenedorResultados.innerHTML = '';
+
+            if (!texto) {
+                contenedorResultados.innerHTML = `<div style="text-align: center; color: #666; font-size: 12px; padding: 4px;">Escribe el nombre de un libro o autor.</div>`;
+                return;
+            }
+
+            const { data, error } = await supabaseClient
+                .from('config_historia')
+                .select('historia_id, titulo_historia, autor')
+                .eq('estado', 'publico')
+                .or(`titulo_historia.ilike.%${texto}%,autor.ilike.%${texto}%`)
+                .limit(5);
+
+            if (error) {
+                console.error("Error en búsqueda:", error);
+                contenedorResultados.innerHTML = `<div style="text-align: center; color: #d9534f; font-size: 12px; padding: 4px;">Ocurrió un error al realizar la búsqueda.</div>`;
+                return;
+            }
+
+            if (data && data.length > 0) {
+                data.forEach(libro => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.innerHTML = `
+                        <div>
+                            <div style="font-weight: bold; color: #2481cc;">${libro.titulo_historia}</div>
+                            <div style="font-size: 11px; color: #666;">Autor: ${libro.autor || 'Desconocido'}</div>
+                        </div>
+                        <span style="font-size: 12px; font-weight: bold; color: #28a745;">Leer ➔</span>
+                    `;
+                    item.onclick = async () => {
+                        historiaActualId = libro.historia_id;
+                        capituloActualId = 'cap_1';
+                        pasoActualIndex = 0;
+                        document.getElementById('otras-historias').style.display = 'none';
+                        document.getElementById('progress-bars-container').style.display = 'flex';
+
+                        if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+
+                        await cargarConfiguracionHistoria(historiaActualId);
+                        await actualizarEstadisticasComunidad();
+                        cargarCapitulo(capituloActualId);
+                    };
+                    contenedorResultados.appendChild(item);
+                });
+            } else {
+                contenedorResultados.innerHTML = `<div style="text-align: center; color: #856404; font-size: 12px; padding: 8px; background: #fff3cd; border-radius: 6px;">No encontramos este título o autor. ¡Pronto podríamos agregarlo!</div>`;
             }
         }
 
