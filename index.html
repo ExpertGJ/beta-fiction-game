@@ -352,15 +352,14 @@
             "audio/theojt-dark-ambient-121126.mp3"
         ];
         
-        // Índice predeterminado para "audio/leberch-reading-books-590361.mp3"
         let indicePistaActual = listaMusica.indexOf("audio/leberch-reading-books-590361.mp3");
-        if (indicePistaActual === -1) indicePistaActual = 0; // Fallback por seguridad
+        if (indicePistaActual === -1) indicePistaActual = 0;
 
         function reproducirPistaPredeterminada() {
             const audio = document.getElementById('bg-music');
             if (listaMusica.length > 0) {
                 audio.src = listaMusica[indicePistaActual];
-                audio.loop = true; // Bucle infinito activado para esta canción
+                audio.loop = true;
                 audio.load();
                 audio.play().catch(err => console.log("Error al reproducir pista predeterminada:", err));
             }
@@ -373,7 +372,7 @@
 
             indicePistaActual = (indicePistaActual + direccion + listaMusica.length) % listaMusica.length;
             audio.src = listaMusica[indicePistaActual];
-            audio.loop = true; // Mantiene el bucle infinito en la nueva canción seleccionada
+            audio.loop = true;
             audio.load();
             audio.play().then(() => {
                 text.innerText = "Música Ambiental: On";
@@ -462,14 +461,13 @@
             }
             if (!listaTodasHistorias || listaTodasHistorias.length === 0) return;
 
-            let currentIndex = listaTodasHistorias.findIndex(h => h.historia_id === historiaActualId);
-            if (currentIndex === -1) currentIndex = 0;
-
-            let nuevoIndex = currentIndex + direccion;
-            if (nuevoIndex >= listaTodasHistorias.length) {
-                nuevoIndex = 0; 
-            } else if (nuevoIndex < 0) {
-                nuevoIndex = listaTodasHistorias.length - 1; 
+            let nuevoIndex;
+            if (listaTodasHistorias.length > 1) {
+                do {
+                    nuevoIndex = Math.floor(Math.random() * listaTodasHistorias.length);
+                } while (listaTodasHistorias[nuevoIndex].historia_id === historiaActualId);
+            } else {
+                nuevoIndex = 0;
             }
 
             const nuevaHistoria = listaTodasHistorias[nuevoIndex];
@@ -609,7 +607,8 @@
             }
 
             if (!params.get('historia') && !params.get('startapp') && !startParam) {
-                historiaActualId = listaTodasHistorias[0].historia_id;
+                const randomIndex = Math.floor(Math.random() * listaTodasHistorias.length);
+                historiaActualId = listaTodasHistorias[randomIndex].historia_id;
             }
 
             pasoActualIndex = 0;
