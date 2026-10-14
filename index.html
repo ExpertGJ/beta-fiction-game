@@ -198,11 +198,10 @@
             display: none;
             margin-top: 10px;
         }
-        /* Sección de Búsqueda Integrada Limpia */
+        /* Buscador perfectamente equilibrado y ajustado */
         .search-section-footer {
             margin-top: 14px;
-            border-top: 1px dashed #ced4da;
-            padding-top: 14px;
+            padding-top: 4px;
             display: flex;
             flex-direction: column;
             gap: 8px;
@@ -211,10 +210,12 @@
             display: flex;
             gap: 8px;
             align-items: center;
+            width: 100%;
         }
         .search-input {
             flex: 1;
-            padding: 11px 14px;
+            min-width: 0;
+            padding: 11px 12px;
             border: 1px solid #ccc;
             border-radius: 10px;
             font-size: 14px;
@@ -228,6 +229,18 @@
         }
         .search-input:focus {
             border-color: #2481cc;
+        }
+        .search-btn {
+            background-color: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            padding: 11px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
         .search-results {
             max-height: 180px;
@@ -251,31 +264,6 @@
         }
         .search-result-item:hover {
             background: #e9ecef;
-        }
-        .story-card {
-            background: #ffffff;
-            border: 1px solid #ced4da;
-            padding: 10px;
-            border-radius: 8px;
-            margin-top: 8px;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            text-align: left;
-        }
-        .story-card:hover {
-            background: #e9ecef;
-        }
-        .story-card-title {
-            font-weight: bold;
-            color: #2481cc;
-            font-size: 15px;
-        }
-        .story-card-author {
-            font-size: 12px;
-            color: #666;
-            font-style: italic;
         }
         .blocked-card {
             background: #fff3cd;
@@ -367,16 +355,13 @@
 
         <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
 
-        <!-- Selector de otras historias y Buscador al terminar -->
+        <!-- Bloque final exclusivo para calificación, donación y el buscador limpio -->
         <div id="otras-historias" class="stories-box">
-            <h3 style="margin-top: 0; font-size: 16px;">Otras historias recomendadas</h3>
-            <div id="lista-historias"></div>
-
-            <!-- Buscador súper limpio e intuitivo al final -->
+            <!-- Buscador súper limpio y equilibrado al final -->
             <div class="search-section-footer">
                 <div class="search-input-group">
                     <input type="text" id="input-busqueda" class="search-input" placeholder="Buscar libro o autor...">
-                    <button class="btn" style="width: auto; padding: 11px 18px; font-size: 14px; border-radius: 10px;" onclick="buscarHistoriaSupabase()">Buscar</button>
+                    <button class="search-btn" onclick="buscarHistoriaSupabase()">Buscar</button>
                 </div>
                 <div id="search-results" class="search-results"></div>
             </div>
@@ -401,7 +386,6 @@
         let autorActualNombre = '';
         let listaTodasHistorias = [];
 
-        // Lista completa de canciones en orden fijo
         const listaMusica = [
             "audio/11145955-mesa-10550.mp3",
             "audio/40173586-magic-forest-473582.mp3",
@@ -463,6 +447,14 @@
             }
         }
 
+        // Limpiar buscador al cambiar de historia
+        function limpiarBuscador() {
+            const input = document.getElementById('input-busqueda');
+            const resultados = document.getElementById('search-results');
+            if (input) input.value = '';
+            if (resultados) resultados.innerHTML = '';
+        }
+
         // Búsqueda ultraligera directa en Supabase
         async function buscarHistoriaSupabase() {
             const texto = document.getElementById('input-busqueda').value.trim();
@@ -502,6 +494,7 @@
                         historiaActualId = libro.historia_id;
                         capituloActualId = 'cap_1';
                         pasoActualIndex = 0;
+                        limpiarBuscador();
                         document.getElementById('otras-historias').style.display = 'none';
                         document.getElementById('progress-bars-container').style.display = 'flex';
 
@@ -574,6 +567,7 @@
         }
 
         async function cambiarHistoriaAdyacente(direccion) {
+            limpiarBuscador();
             if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
                 await cargarListaHistoriasGlobal();
             }
@@ -815,7 +809,7 @@
                 `;
                 contenedorOpciones.appendChild(bloqueFinal);
                 
-                mostrarOtrasHistorias();
+                document.getElementById('otras-historias').style.display = 'block';
                 return;
             }
 
@@ -890,41 +884,6 @@
             };
 
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-        }
-
-        async function mostrarOtrasHistorias() {
-            if (!listaTodasHistorias || listaTodasHistorias.length <= 1) {
-                await cargarListaHistoriasGlobal();
-            }
-
-            if (!listaTodasHistorias || listaTodasHistorias.length <= 1) return;
-
-            const contenedorLista = document.getElementById('lista-historias');
-            contenedorLista.innerHTML = '';
-
-            listaTodasHistorias.forEach(h => {
-                if (h.historia_id !== historiaActualId) {
-                    const card = document.createElement('div');
-                    card.className = 'story-card';
-                    card.innerHTML = `
-                        <div class="story-card-title">${h.titulo_historia}</div>
-                        <div class="story-card-author">Autor: ${h.autor || 'Desconocido'}</div>
-                    `;
-                    card.onclick = async () => {
-                        historiaActualId = h.historia_id;
-                        capituloActualId = 'cap_1';
-                        pasoActualIndex = 0; 
-                        document.getElementById('progress-bars-container').style.display = 'flex';
-                        
-                        await cargarConfiguracionHistoria(historiaActualId);
-                        await actualizarEstadisticasComunidad();
-                        cargarCapitulo(capituloActualId);
-                    };
-                    contenedorLista.appendChild(card);
-                }
-            });
-
-            document.getElementById('otras-historias').style.display = 'block';
         }
     </script>
 </body>
