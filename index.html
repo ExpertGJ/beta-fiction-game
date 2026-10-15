@@ -308,7 +308,6 @@
     </style>
 </head>
 <body>
-
     <div class="container" id="app">
         <!-- Panel Superior -->
         <div class="stats-box" id="stats-panel">
@@ -324,36 +323,28 @@
             </div>
             <button class="nav-arrow" onclick="cambiarHistoriaAdyacente(1)">&#10095;</button>
         </div>
-
         <!-- Reproductor de Música Ambiental -->
         <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin: 5px 0;">
             <audio id="bg-music" preload="none" loop></audio>
             <button class="music-nav-arrow" onclick="cambiarPistaManual(-1)">&#171;</button>
             <button class="btn" style="padding: 10px 14px; font-size: 13px; width: auto; border-radius: 8px;" onclick="toggleMusicaAleatoria()">
-                🎵 <span id="music-text">Música Ambiental: Off</span>
+            🎵 <span id="music-text">Música Ambiental: Off</span>
             </button>
             <button class="music-nav-arrow" onclick="cambiarPistaManual(1)">&#187;</button>
         </div>
-
         <!-- Imagen de la escena -->
         <img id="imagen" alt="Escena" referrerpolicy="no-referrer">
-        
         <!-- Barritas de Progreso Dinámicas -->
         <div class="progress-bars" id="progress-bars-container"></div>
-
         <!-- Título condicional del capítulo/sección -->
         <div id="titulo" class="title" style="display: none;"></div>
         <!-- Descripción de la escena -->
         <div id="pregunta" class="question">Por favor, espera...</div>
-        
         <!-- Contenedor dinámico de opciones -->
         <div id="opciones-container" class="options-container"></div>
-        
         <!-- Texto agregado debajo de las opciones -->
         <div id="hint-siguiente" class="instruction-hint">¡Elige una opción y presiona siguiente!</div>
-
         <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
-
         <!-- Bloque final exclusivo para buscador y opciones de fin -->
         <div id="otras-historias" class="stories-box">
             <div class="search-section-footer">
@@ -365,24 +356,19 @@
             </div>
         </div>
     </div>
-
     <script>
         const SUPABASE_URL = 'https://cnhtbdzzcfvrdkqzrfjf.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNuaHRiZHp6Y2Z2cmRrcXpyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE2NDUzMTcsImV4cCI6MjEwNzIyMTMxN30.nBKNHG4ArcWkctm8n-rF592wZ2Aa7MG4fS-qswboWD0';
-        
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             auth: { persistSession: false }
         });
-
         const tg = window.Telegram.WebApp;
         tg.expand();
-
         let historiaActualId = '';
         let capituloActualId = 'cap_1';
-        let totalPasosHistoria = 3; 
-        let pasoActualIndex = 0; 
+        let totalPasosHistoria = 3;
+        let pasoActualIndex = 0;
         let autorActualNombre = '';
-
         const listaMusica = [
             "audio/11145955-mesa-10550.mp3",
             "audio/40173586-magic-forest-473582.mp3",
@@ -395,10 +381,8 @@
             "audio/the_mountain-suspense-cyberpunk-375986.mp3",
             "audio/theojt-dark-ambient-121126.mp3"
         ];
-        
         let indicePistaActual = listaMusica.indexOf("audio/leberch-reading-books-590361.mp3");
         if (indicePistaActual === -1) indicePistaActual = 0;
-
         function reproducirPistaPredeterminada() {
             const audio = document.getElementById('bg-music');
             if (listaMusica.length > 0) {
@@ -408,12 +392,10 @@
                 audio.play().catch(err => console.log("Error al reproducir pista predeterminada:", err));
             }
         }
-
         function cambiarPistaManual(direccion) {
             const audio = document.getElementById('bg-music');
             const text = document.getElementById('music-text');
             if (listaMusica.length === 0) return;
-
             indicePistaActual = (indicePistaActual + direccion + listaMusica.length) % listaMusica.length;
             audio.src = listaMusica[indicePistaActual];
             audio.loop = true;
@@ -423,18 +405,15 @@
                 if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
             }).catch(err => console.log("Error al cambiar pista manualmente:", err));
         }
-
         function toggleMusicaAleatoria() {
             const audio = document.getElementById('bg-music');
             const text = document.getElementById('music-text');
-            
             if (audio.paused) {
                 if (!audio.src || audio.src === "" || audio.src === window.location.href) {
                     reproducirPistaPredeterminada();
                 } else {
                     audio.play().catch(err => console.log("Error al reproducir audio:", err));
                 }
-
                 text.innerText = "Música Ambiental: On";
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             } else {
@@ -443,37 +422,31 @@
                 if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
             }
         }
-
         function limpiarBuscador() {
             const input = document.getElementById('input-busqueda');
             const resultados = document.getElementById('search-results');
             if (input) input.value = '';
             if (resultados) resultados.innerHTML = '';
         }
-
         async function buscarHistoriaSupabase() {
             const texto = document.getElementById('input-busqueda').value.trim();
             const contenedorResultados = document.getElementById('search-results');
             contenedorResultados.innerHTML = '';
-
             if (!texto) {
                 contenedorResultados.innerHTML = `<div style="text-align: center; color: #666; font-size: 12px; padding: 4px;">Escribe el nombre de un libro o autor.</div>`;
                 return;
             }
-
             const { data, error } = await supabaseClient
                 .from('config_historia')
                 .select('historia_id, titulo_historia, autor')
                 .eq('estado', 'publico')
                 .or(`titulo_historia.ilike.%${texto}%,autor.ilike.%${texto}%`)
                 .limit(5);
-
             if (error) {
                 console.error("Error en búsqueda:", error);
                 contenedorResultados.innerHTML = `<div style="text-align: center; color: #d9534f; font-size: 12px; padding: 4px;">Ocurrió un error al realizar la búsqueda.</div>`;
                 return;
             }
-
             if (data && data.length > 0) {
                 data.forEach(libro => {
                     const item = document.createElement('div');
@@ -492,9 +465,7 @@
                         limpiarBuscador();
                         document.getElementById('otras-historias').style.display = 'none';
                         document.getElementById('progress-bars-container').style.display = 'flex';
-
                         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-
                         await cargarConfiguracionHistoria(historiaActualId);
                         await actualizarEstadisticasComunidad();
                         await cargarCapitulo(capituloActualId);
@@ -505,20 +476,16 @@
                 contenedorResultados.innerHTML = `<div style="text-align: center; color: #856404; font-size: 12px; padding: 8px; background: #fff3cd; border-radius: 6px;">No encontramos este título o autor. ¡Pronto podríamos agregarlo!</div>`;
             }
         }
-
         function verificarParametroHistoria() {
             const params = new URLSearchParams(window.location.search);
             let historiaParam = params.get('historia') || params.get('startapp');
-            
             if (!historiaParam && tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
                 historiaParam = tg.initDataUnsafe.start_param;
             }
-
             if (historiaParam) {
                 historiaActualId = historiaParam;
             }
         }
-
         function barajarArreglo(array) {
             let arr = [...array];
             for (let i = arr.length - 1; i > 0; i--) {
@@ -527,7 +494,6 @@
             }
             return arr;
         }
-
         function obtenerIndicePorIdCapitulo(idCap) {
             if (idCap === 'fin' || idCap.includes('epilogo')) return totalPasosHistoria - 1;
             const match = idCap.match(/\d+/);
@@ -537,106 +503,114 @@
             }
             return pasoActualIndex;
         }
-
         function actualizarBarritasProgreso() {
             const contenedor = document.getElementById('progress-bars-container');
             let htmlBarritas = '';
-            
             for (let i = 0; i < totalPasosHistoria; i++) {
                 let claseActiva = i <= pasoActualIndex ? 'bar active' : 'bar';
                 htmlBarritas += `<div class="${claseActiva}"></div>`;
             }
-            
             contenedor.innerHTML = htmlBarritas;
         }
+     // SELECCIÓN ALEATORIA ULTRALIGERA: no descarga la lista de historias.
+     // 1) Un conteo con head:true (solo un número, sin filas).
+     // 2) UNA sola fila al azar (solo la columna historia_id), distinta de la actual.
+     async function cambiarHistoriaAdyacente(direccion) {
+        if (cambiarHistoriaAdyacente.enCurso) return; // evita clics solapados
+        cambiarHistoriaAdyacente.enCurso = true;
 
-        // SELECCIÓN ALEATORIA ULTRALIGERA: Solo pide IDs (cero descarga masiva de datos)
-        async function cambiarHistoriaAdyacente(direccion) {
-            limpiarBuscador();
+        try {
+          limpiarBuscador();
 
-            const { data, error } = await supabaseClient
-                .from('config_historia')
-                .select('historia_id')
-                .eq('estado', 'publico');
+          let consultaConteo = supabaseClient
+            .from('config_historia')
+            .select('historia_id', { count: 'exact', head: true })
+            .eq('estado', 'publico');
+          if (historiaActualId) consultaConteo = consultaConteo.neq('historia_id', historiaActualId);
 
-            if (error || !data || data.length === 0) return;
+          const { count, error: errorConteo } = await consultaConteo;
+          if (errorConteo || !count) return; // no hay otra historia a la que ir
 
-            const randomIndex = Math.floor(Math.random() * data.length);
-            historiaActualId = data[randomIndex].historia_id;
+          const randomIndex = Math.floor(Math.random() * count);
 
-            capituloActualId = 'cap_1';
-            pasoActualIndex = 0;
-            document.getElementById('progress-bars-container').style.display = 'flex';
+          let consultaFila = supabaseClient
+            .from('config_historia')
+            .select('historia_id')
+            .eq('estado', 'publico');
+          if (historiaActualId) consultaFila = consultaFila.neq('historia_id', historiaActualId);
 
-            if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+          const { data, error } = await consultaFila
+            .order('historia_id', { ascending: true })
+            .range(randomIndex, randomIndex);
 
-            await cargarConfiguracionHistoria(historiaActualId);
-            await actualizarEstadisticasComunidad();
-            await cargarCapitulo(capituloActualId);
+          if (error || !data || data.length === 0) return;
+
+          historiaActualId = data[0].historia_id;
+
+          capituloActualId = 'cap_1';
+          pasoActualIndex = 0;
+          document.getElementById('progress-bars-container').style.display = 'flex';
+
+          if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+
+          await cargarConfiguracionHistoria(historiaActualId);
+          await actualizarEstadisticasComunidad();
+          await cargarCapitulo(capituloActualId);
+        } finally {
+          cambiarHistoriaAdyacente.enCurso = false;
         }
+    }
 
         async function cargarConfiguracionHistoria(hId) {
             const { count, error } = await supabaseClient
                 .from('capitulos')
                 .select('*', { count: 'exact', head: true })
                 .eq('historia_id', hId);
-
             if (!error && count && count > 0) {
                 totalPasosHistoria = count;
             }
-
             const { data: configData } = await supabaseClient
                 .from('config_historia')
                 .select('*')
                 .eq('historia_id', hId)
                 .maybeSingle();
-
             if (configData) {
                 autorActualNombre = configData.autor || 'Desconocido';
                 document.getElementById('story-title-author').innerText = configData.titulo_historia;
                 document.getElementById('story-author-name').innerText = `Autor: ${autorActualNombre}`;
             }
         }
-
         async function actualizarEstadisticasComunidad() {
             const { data, error } = await supabaseClient
                 .from('promedios_globales')
                 .select('*')
                 .eq('historia_id', historiaActualId)
                 .maybeSingle();
-
             if (error || !data) {
                 document.getElementById('avg-rating-num').innerText = '0.0';
                 document.getElementById('avg-stars-icon').innerText = '☆☆☆☆☆';
                 document.getElementById('total-ratings-count').innerText = '(0)';
                 return;
             }
-
             let totalVotos = data.total_votos_estrellas || 0;
             let sumaEstrellas = data.suma_estrellas || 0;
             let promedio = totalVotos > 0 ? (sumaEstrellas / totalVotos).toFixed(1) : '0.0';
-
             document.getElementById('avg-rating-num').innerText = promedio;
             document.getElementById('total-ratings-count').innerText = `(${totalVotos})`;
-
             let numEstrellasEnteras = Math.round(parseFloat(promedio));
             let estrellasStr = '★'.repeat(numEstrellasEnteras) + '☆'.repeat(5 - numEstrellasEnteras);
             document.getElementById('avg-stars-icon').innerText = estrellasStr;
         }
-
         async function registrarVotoEstrellas(calificacion) {
             const { data: actual } = await supabaseClient
                 .from('promedios_globales')
                 .select('*')
                 .eq('historia_id', historiaActualId)
                 .maybeSingle();
-
             let errorAccion = null;
-
             if (actual) {
                 let nuevoTotalVotos = (actual.total_votos_estrellas || 0) + 1;
                 let nuevaSumaEstrellas = (actual.suma_estrellas || 0) + calificacion;
-
                 const { error } = await supabaseClient
                     .from('promedios_globales')
                     .update({
@@ -655,26 +629,21 @@
                     }]);
                 errorAccion = error;
             }
-
             if (errorAccion) {
                 console.error("Error al registrar voto:", errorAccion);
                 return;
             }
-
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-            
             const contenedorVoto = document.getElementById('seccion-votacion-estrellas');
             if (contenedorVoto) {
                 contenedorVoto.innerHTML = `<div style="font-weight: bold; color: #28a745; padding: 10px;">¡Gracias por tu voto de ${calificacion} estrellas! ⭐</div>`;
             }
             await actualizarEstadisticasComunidad();
         }
-
         async function iniciarApp() {
             const telegramUser = tg.initDataUnsafe?.user;
             const params = new URLSearchParams(window.location.search);
             const startParam = tg.initDataUnsafe?.start_param;
-            
             if ((!telegramUser || !telegramUser.id) && !params.get('historia') && !params.get('startapp') && !startParam) {
                 document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
@@ -684,21 +653,17 @@
                 `;
                 return;
             }
-
             verificarParametroHistoria();
-
             if (!historiaActualId) {
                 const { data, error } = await supabaseClient
                     .from('config_historia')
                     .select('historia_id')
                     .eq('estado', 'publico');
-
                 if (data && data.length > 0) {
                     const randomIndex = Math.floor(Math.random() * data.length);
                     historiaActualId = data[randomIndex].historia_id;
                 }
             }
-
             if (!historiaActualId) {
                 document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
@@ -708,43 +673,33 @@
                 `;
                 return;
             }
-
             pasoActualIndex = 0;
             await cargarConfiguracionHistoria(historiaActualId);
             await actualizarEstadisticasComunidad();
             await cargarCapitulo(capituloActualId);
         }
-
         setTimeout(iniciarApp, 500);
-
         async function cargarCapitulo(idCapitulo) {
             document.getElementById('btn_next').style.display = 'none';
             document.getElementById('hint-siguiente').style.display = 'block';
             document.getElementById('otras-historias').style.display = 'none';
             document.getElementById('progress-bars-container').style.display = 'flex';
-            
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
-
             pasoActualIndex = obtenerIndicePorIdCapitulo(idCapitulo);
             actualizarBarritasProgreso();
-
             const { data: opcionesList } = await supabaseClient
                 .from('opciones')
                 .select('*')
                 .eq('historia_id', historiaActualId)
                 .eq('capitulo_id', idCapitulo);
-
             const opcionesValidas = opcionesList ? opcionesList.filter(o => o.texto_opcion && o.texto_opcion.trim() !== '' && o.texto_opcion.trim() !== 'EMPTY') : [];
-
             const { data: capituloData, error } = await supabaseClient
                 .from('capitulos')
                 .select('*')
                 .eq('historia_id', historiaActualId)
                 .eq('capitulo_id', idCapitulo)
                 .maybeSingle();
-
             if (error || !capituloData) return;
-
             const elementoTitulo = document.getElementById('titulo');
             if (capituloData.titulo && capituloData.titulo.trim() !== '') {
                 elementoTitulo.innerText = capituloData.titulo;
@@ -753,12 +708,9 @@
                 elementoTitulo.innerText = '';
                 elementoTitulo.style.display = 'none';
             }
-
             document.getElementById('pregunta').innerText = capituloData.descripcion;
-
             const contenedorOpciones = document.getElementById('opciones-container');
             contenedorOpciones.innerHTML = '';
-
             let esFinal = (idCapitulo === 'fin' || idCapitulo.includes('epilogo'));
             if (!esFinal && opcionesValidas.length === 0) {
                 let siguienteDestino = 'cap_' + (pasoActualIndex + 2);
@@ -769,24 +721,19 @@
                     esFinal = true;
                 }
             }
-
             if (esFinal) {
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
-
                 document.getElementById('hint-siguiente').style.display = 'none';
-
                 const bloqueFinal = document.createElement('div');
                 bloqueFinal.innerHTML = `
                     <div class="rating-box" id="seccion-votacion-estrellas">
                         <div style="font-weight: bold; font-size: 14px;">¿Qué te pareció la historia?</div>
                         <div class="interactive-stars" id="star-selector">
-                            <span onclick="registrarVotoEstrellas(1)">★</span><span onclick="registrarVotoEstrellas(2)">★</span><span onclick="registrarVotoEstrellas(3)">★</span><span onclick="registrarVotoEstrellas(4)">★</span><span onclick="registrarVotoEstrellas(5)">★</span>
+                            <span onclick="registrarVotoEstrellas(1)">★</span><spanonclick="registrarVotoEstrellas(2)">★</span><spanonclick="registrarVotoEstrellas(3)">★</span><spanonclick="registrarVotoEstrellas(4)">★</span><spanonclick="registrarVotoEstrellas(5)">★</span>
                         </div>
                     </div>
-
-                    <button class="btn btn-share" onclick="compartirReseña()">Compartir Reseña</button>
-
+                    <button class="btn btn-share" onclick="compartirReseña()">CompartirReseña</button>
                     <div class="donation-box">
                         <div class="donation-text">
                             Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nosso canal.
@@ -795,11 +742,9 @@
                     </div>
                 `;
                 contenedorOpciones.appendChild(bloqueFinal);
-                
                 document.getElementById('otras-historias').style.display = 'block';
                 return;
             }
-
             if (opcionesValidas.length > 0) {
                 const opcionesAleatorias = barajarArreglo(opcionesValidas);
                 opcionesAleatorias.forEach((opcion) => {
@@ -813,12 +758,10 @@
                 document.getElementById('hint-siguiente').style.display = 'none';
                 const btnNext = document.getElementById('btn_next');
                 btnNext.style.display = 'block';
-                
                 let siguienteDestino = 'cap_' + (pasoActualIndex + 2);
                 if (opcionesList && opcionesList.length > 0 && opcionesList[0].siguiente_capitulo) {
                     siguienteDestino = opcionesList[0].siguiente_capitulo;
                 }
-
                 btnNext.onclick = () => {
                     pasoActualIndex = obtenerIndicePorIdCapitulo(siguienteDestino);
                     capituloActualId = siguienteDestino;
@@ -826,41 +769,31 @@
                 };
             }
         }
-
         function compartirReseña() {
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-
             const tituloObra = document.getElementById('story-title-author').innerText;
-            const botUsername = 'BetaReadsBot'; 
-            
+            const botUsername = 'BetaReadsBot';
             const linkDirectoApp = `https://t.me/${botUsername}?startapp=${historiaActualId}`;
             const urlTelegramShare = `https://t.me/share/url?url=${encodeURIComponent(linkDirectoApp)}&text=${encodeURIComponent(`¡Lee "${tituloObra}" en Beta Reads!`)}`;
-
             if (tg && typeof tg.openTelegramLink === 'function') {
                 tg.openTelegramLink(urlTelegramShare);
             } else {
                 window.open(urlTelegramShare, '_blank');
             }
         }
-
         function abrirCanalRegalos() {
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-            
             const urlCanal = 'https://t.me/BookBetaReader';
-
             if (tg && typeof tg.openLink === 'function') {
                 tg.openLink(urlCanal);
             } else {
                 window.open(urlCanal, '_blank');
             }
         }
-
         function procesarSeleccionOpcion(opcionElegida) {
             const botones = document.querySelectorAll('#opciones-container .btn');
             botones.forEach(b => b.disabled = true);
-            
             document.getElementById('hint-siguiente').style.display = 'none';
-
             const btnNext = document.getElementById('btn_next');
             btnNext.style.display = 'block';
             btnNext.onclick = () => {
@@ -868,7 +801,6 @@
                 capituloActualId = opcionElegida.siguiente_capitulo;
                 cargarCapitulo(capituloActualId);
             };
-
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
         }
     </script>
