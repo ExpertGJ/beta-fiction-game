@@ -373,6 +373,17 @@
         let totalPasosHistoria = 3;
         let pasoActualIndex = 0;
         let autorActualNombre = '';
+
+        // Historial en memoria (0 tráfico al ir atrás/adelante) y control de repetidas
+        let historialHistorias = [];
+        let indiceHistorial = -1;
+        let historiaSiguientePrefetch = null;
+        let timerPrefetch = null;
+        const MAX_HISTORIAL = 30;
+        const MAX_VISTAS = 20;
+        let vistasRecientes = [];
+        try { vistasRecientes = JSON.parse(localStorage.getItem('br_vistas') || '[]'); } catch (e) { vistasRecientes = []; }
+
         const listaMusica = [
             "audio/11145955-mesa-10550.mp3",
             "audio/40173586-magic-forest-473582.mp3",
@@ -508,6 +519,12 @@
                         document.getElementById('progress-bars-container').style.display = 'flex';
                         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                         const historiaCargada = await cargarConfiguracionHistoria(historiaActualId);
+                        if (historiaCargada) {
+                            registrarEnHistorial(historiaCargada);
+                            // La precarga anterior se pidió antes de conocer esta historia: se descarta
+                            historiaSiguientePrefetch = null;
+                            precargarSiguiente();
+                        }
                         await cargarCapitulo(capituloActualId, historiaCargada && historiaCargada.cap_1);
                     };
                     contenedorResultados.appendChild(item);
@@ -561,27 +578,76 @@
             }
             contenedor.innerHTML = htmlBarritas;
         }
-        // SELECCIÓN ALEATORIA ULTRALIGERA: UNA sola petición a la base (función obtener_historia_aleatoria).
-        // Devuelve solo la historia elegida (título, autor, total de capítulos, estrellas y capítulo 1).
-        // Nunca se descarga la lista de historias, sin importar cuántas existan.
+
+        // ---------- SELECCIÓN PONDERADA (40% recientes / 60% resto) ----------
+        // La elección se hace dentro de Supabase (función obtener_historia_ponderada):
+        // UNA sola petición por historia nueva, nunca se descarga la lista.
+
+        function registrarEnHistorial(data) {
+            historialHistorias = historialHistorias.slice(0, indiceHistorial + 1);
+            historialHistorias.push(data);
+            if (historialHistorias.length > MAX_HISTORIAL) historialHistorias.shift();
+            indiceHistorial = historialHistorias.length - 1;
+
+            // Recordar las últimas vistas (también entre sesiones, sin tráfico)
+            vistasRecientes = vistasRecientes.filter(id => id !== data.historia_id);
+            vistasRecientes.push(data.historia_id);
+            if (vistasRecientes.length > MAX_VISTAS) vistasRecientes.shift();
+            try { localStorage.setItem('br_vistas', JSON.stringify(vistasRecientes)); } catch (e) {}
+        }
+
+        function pedirHistoriaPonderada() {
+            return supabaseClient
+                .rpc('obtener_historia_ponderada', { p_excluir: vistasRecientes })
+                .then(({ data, error }) => (error || !data) ? null : data);
+        }
+
+        // Precarga diferida: espera 8 s para no gastar tráfico si el usuario cierra enseguida
+        function precargarSiguiente() {
+            clearTimeout(timerPrefetch);
+            if (historiaSiguientePrefetch) return;
+            timerPrefetch = setTimeout(() => {
+                if (!historiaSiguientePrefetch) historiaSiguientePrefetch = pedirHistoriaPonderada();
+            }, 8000);
+        }
+
+        async function mostrarHistoria(data) {
+            historiaActualId = data.historia_id;
+            capituloActualId = 'cap_1';
+            pasoActualIndex = 0;
+            document.getElementById('progress-bars-container').style.display = 'flex';
+            aplicarConfigHistoria(data);
+            await cargarCapitulo('cap_1', data.cap_1);
+        }
+
         async function cambiarHistoriaAdyacente(direccion) {
             if (cambiarHistoriaAdyacente.enCurso) return; // evita clics solapados
             cambiarHistoriaAdyacente.enCurso = true;
             try {
                 limpiarBuscador();
-                const { data, error } = await supabaseClient
-                    .rpc('obtener_historia_aleatoria', { p_excluir: historiaActualId || null });
-                if (error || !data) return; // no hay otra historia a la que ir
-
-                historiaActualId = data.historia_id;
-                capituloActualId = 'cap_1';
-                pasoActualIndex = 0;
-                document.getElementById('progress-bars-container').style.display = 'flex';
-
                 if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
 
-                aplicarConfigHistoria(data);
-                await cargarCapitulo(capituloActualId, data.cap_1);
+                // Ir atrás/adelante dentro de lo ya visto: sin tráfico
+                const destino = indiceHistorial + direccion;
+                if (destino >= 0 && destino < historialHistorias.length) {
+                    indiceHistorial = destino;
+                    await mostrarHistoria(historialHistorias[destino]);
+                    return;
+                }
+
+                // Historia nueva: usa la precargada si existe
+                clearTimeout(timerPrefetch);
+                let data = null;
+                if (historiaSiguientePrefetch) {
+                    data = await historiaSiguientePrefetch;
+                    historiaSiguientePrefetch = null;
+                }
+                if (!data) data = await pedirHistoriaPonderada();
+                if (!data) return; // no hay otra historia a la que ir
+
+                registrarEnHistorial(data);
+                await mostrarHistoria(data);
+                precargarSiguiente();
             } finally {
                 cambiarHistoriaAdyacente.enCurso = false;
             }
@@ -650,9 +716,8 @@
             verificarParametroHistoria();
             let historiaPrecargada = null;
             if (!historiaActualId) {
-                // Una sola petición: trae solo UNA historia al azar (no la lista completa)
-                const { data } = await supabaseClient
-                    .rpc('obtener_historia_aleatoria', { p_excluir: null });
+                // Una sola petición: trae solo UNA historia (selección ponderada 40/60)
+                const data = await pedirHistoriaPonderada();
                 if (data) {
                     historiaActualId = data.historia_id;
                     historiaPrecargada = data;
@@ -673,6 +738,8 @@
             } else {
                 historiaPrecargada = await cargarConfiguracionHistoria(historiaActualId);
             }
+            if (historiaPrecargada) registrarEnHistorial(historiaPrecargada);
+            precargarSiguiente();
             await cargarCapitulo(capituloActualId, historiaPrecargada && historiaPrecargada.cap_1);
         }
         setTimeout(iniciarApp, 500);
