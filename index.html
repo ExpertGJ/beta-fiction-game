@@ -382,7 +382,7 @@
         let totalPasosHistoria = 3; 
         let pasoActualIndex = 0; 
         let autorActualNombre = '';
-        let historiasVistas = new Set(); // Control de historias vistas en la sesión[cite: 26]
+        let historiasVistas = new Set();[cite: 26]
 
         const listaMusica = [
             "audio/11145955-mesa-10550.mp3",
@@ -543,8 +543,12 @@
             contenedor.innerHTML = htmlBarritas;
         }
 
-        // Función optimizada: Obtiene un ID de historia aleatorio que NO se haya visto, consultando solo IDs (cero desperdicio de datos)
+        // Selección ultraligera y sincronizada por demanda (protege los 5 GB de Supabase)
         async function obtenerIdHistoriaAleatoriaNoVista() {
+            if (historiaActualId) {
+                historiasVistas.add(historiaActualId);
+            }
+
             let query = supabaseClient
                 .from('config_historia')
                 .select('historia_id')
@@ -558,21 +562,24 @@
             const { data, error } = await query;
 
             if (error || !data || data.length === 0) {
-                // Si ya se recorrieron todas, se reinicia el ciclo de vistas
                 historiasVistas.clear();
+                if (historiaActualId) historiasVistas.add(historiaActualId);
                 return obtenerIdHistoriaAleatoriaNoVista();
             }
 
-            const randomIndex = Math.floor(Math.random() * data.length);
-            return data[randomIndex].historia_id;
+            // Excluimos estrictamente el ID actual para evitar repeticiones visuales inmediatas
+            const disponibles = data.filter(h => h.historia_id !== historiaActualId);
+            
+            if (disponibles.length === 0) {
+                return data[0].historia_id;
+            }
+
+            const randomIndex = Math.floor(Math.random() * disponibles.length);
+            return disponibles[randomIndex].historia_id;
         }
 
         async function cambiarHistoriaAdyacente(direccion) {
             limpiarBuscador();
-
-            if (historiaActualId) {
-                historiasVistas.add(historiaActualId);
-            }
 
             const nuevoId = await obtenerIdHistoriaAleatoriaNoVista();
             if (!nuevoId) return;
@@ -588,7 +595,7 @@
 
             await cargarConfiguracionHistoria(historiaActualId);
             await actualizarEstadisticasComunidad();
-            cargarCapitulo(capituloActualId);
+            await cargarCapitulo(capituloActualId);
         }
 
         async function cargarConfiguracionHistoria(hId) {
@@ -735,7 +742,6 @@
             document.getElementById('otras-historias').style.display = 'none';
             document.getElementById('progress-bars-container').style.display = 'flex';
             
-            document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
             pasoActualIndex = obtenerIndicePorIdCapitulo(idCapitulo);
             actualizarBarritasProgreso();
 
@@ -755,6 +761,9 @@
                 .maybeSingle();
 
             if (error || !capituloData) return;
+
+            // Sincronización perfecta: la imagen cambia exactamente al mismo tiempo que el texto del capítulo
+            document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
 
             const elementoTitulo = document.getElementById('titulo');
             if (capituloData.titulo && capituloData.titulo.trim() !== '') {
@@ -790,7 +799,7 @@
                 const bloqueFinal = document.createElement('div');
                 bloqueFinal.innerHTML = `
                     <div class="rating-box" id="seccion-votacion-estrellas">
-                        <div style="font-weight: bold; font-size: 14px;">¿Qué te pareció la historia?</div>
+                        <div style="font-weight: bold; font-size: 14px;">¿Qué te pareció la historia? Califícala:</div>
                         <div class="interactive-stars" id="star-selector">
                             <span onclick="registrarVotoEstrellas(1)">★</span><span onclick="registrarVotoEstrellas(2)">★</span><span onclick="registrarVotoEstrellas(3)">★</span><span onclick="registrarVotoEstrellas(4)">★</span><span onclick="registrarVotoEstrellas(5)">★</span>
                         </div>
@@ -800,7 +809,7 @@
 
                     <div class="donation-box">
                         <div class="donation-text">
-                            Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
+                            Mantener هذا espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
                         </div>
                         <button class="btn-channel" onclick="abrirCanalRegalos()">Ver Canal</button>
                     </div>
