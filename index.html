@@ -714,6 +714,14 @@
                 aplicarConfigHistoria(historiaPrecargada);
             } else {
                 historiaPrecargada = await cargarConfiguracionHistoria(historiaActualId);
+                if (!historiaPrecargada) {
+                    // Enlace a una historia privada o inexistente: mostrar otra
+                    historiaPrecargada = await pedirHistoriaPonderada();
+                    if (historiaPrecargada) {
+                        historiaActualId = historiaPrecargada.historia_id;
+                        aplicarConfigHistoria(historiaPrecargada);
+                    }
+                }
             }
             if (historiaPrecargada) registrarEnHistorial(historiaPrecargada);
             await cargarCapitulo(capituloActualId, historiaPrecargada && historiaPrecargada.cap_1);
