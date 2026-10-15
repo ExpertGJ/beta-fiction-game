@@ -377,8 +377,6 @@
         // Historial en memoria (0 tráfico al ir atrás/adelante) y control de repetidas
         let historialHistorias = [];
         let indiceHistorial = -1;
-        let historiaSiguientePrefetch = null;
-        let timerPrefetch = null;
         const MAX_HISTORIAL = 30;
         const MAX_VISTAS = 20;
         let vistasRecientes = [];
@@ -519,12 +517,7 @@
                         document.getElementById('progress-bars-container').style.display = 'flex';
                         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                         const historiaCargada = await cargarConfiguracionHistoria(historiaActualId);
-                        if (historiaCargada) {
-                            registrarEnHistorial(historiaCargada);
-                            // La precarga anterior se pidió antes de conocer esta historia: se descarta
-                            historiaSiguientePrefetch = null;
-                            precargarSiguiente();
-                        }
+                        if (historiaCargada) registrarEnHistorial(historiaCargada);
                         await cargarCapitulo(capituloActualId, historiaCargada && historiaCargada.cap_1);
                     };
                     contenedorResultados.appendChild(item);
@@ -602,15 +595,6 @@
                 .then(({ data, error }) => (error || !data) ? null : data);
         }
 
-        // Precarga diferida: espera 8 s para no gastar tráfico si el usuario cierra enseguida
-        function precargarSiguiente() {
-            clearTimeout(timerPrefetch);
-            if (historiaSiguientePrefetch) return;
-            timerPrefetch = setTimeout(() => {
-                if (!historiaSiguientePrefetch) historiaSiguientePrefetch = pedirHistoriaPonderada();
-            }, 8000);
-        }
-
         async function mostrarHistoria(data) {
             historiaActualId = data.historia_id;
             capituloActualId = 'cap_1';
@@ -635,19 +619,12 @@
                     return;
                 }
 
-                // Historia nueva: usa la precargada si existe
-                clearTimeout(timerPrefetch);
-                let data = null;
-                if (historiaSiguientePrefetch) {
-                    data = await historiaSiguientePrefetch;
-                    historiaSiguientePrefetch = null;
-                }
-                if (!data) data = await pedirHistoriaPonderada();
+                // Historia nueva: una sola petición, solo cuando el usuario la pide
+                const data = await pedirHistoriaPonderada();
                 if (!data) return; // no hay otra historia a la que ir
 
                 registrarEnHistorial(data);
                 await mostrarHistoria(data);
-                precargarSiguiente();
             } finally {
                 cambiarHistoriaAdyacente.enCurso = false;
             }
@@ -739,7 +716,6 @@
                 historiaPrecargada = await cargarConfiguracionHistoria(historiaActualId);
             }
             if (historiaPrecargada) registrarEnHistorial(historiaPrecargada);
-            precargarSiguiente();
             await cargarCapitulo(capituloActualId, historiaPrecargada && historiaPrecargada.cap_1);
         }
         setTimeout(iniciarApp, 500);
