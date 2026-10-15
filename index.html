@@ -242,7 +242,7 @@
             flex-shrink: 0;
         }
         .search-results {
-            max-height: 180px;
+            max-height: 230px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
@@ -353,6 +353,10 @@
                     <button class="search-btn" onclick="buscarHistoriaSupabase()">Buscar</button>
                 </div>
                 <div id="search-results" class="search-results"></div>
+                <div id="search-pagination" style="display: none; justify-content: space-between; align-items: center;">
+                    <button id="search-prev" class="nav-arrow" onclick="cambiarPaginaBusqueda(-1)">&#10094;</button>
+                    <button id="search-next" class="nav-arrow" onclick="cambiarPaginaBusqueda(1)">&#10095;</button>
+                </div>
             </div>
         </div>
     </div>
@@ -422,32 +426,69 @@
                 if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
             }
         }
+        // Buscador paginado: máximo 4 resultados por página.
+        // Se piden 5 filas (4 + 1) solo para saber si existe una página siguiente, sin contar toda la tabla.
+        const RESULTADOS_POR_PAGINA = 4;
+        let terminoBusqueda = '';
+        let paginaBusqueda = 0;
+        let buscandoPagina = false;
+
         function limpiarBuscador() {
             const input = document.getElementById('input-busqueda');
             const resultados = document.getElementById('search-results');
             if (input) input.value = '';
             if (resultados) resultados.innerHTML = '';
+            const paginacion = document.getElementById('search-pagination');
+            if (paginacion) paginacion.style.display = 'none';
+            terminoBusqueda = '';
+            paginaBusqueda = 0;
         }
         async function buscarHistoriaSupabase() {
             const texto = document.getElementById('input-busqueda').value.trim();
             const contenedorResultados = document.getElementById('search-results');
             contenedorResultados.innerHTML = '';
+            document.getElementById('search-pagination').style.display = 'none';
             if (!texto) {
                 contenedorResultados.innerHTML = `<div style="text-align: center; color: #666; font-size: 12px; padding: 4px;">Escribe el nombre de un libro o autor.</div>`;
                 return;
             }
-            const { data, error } = await supabaseClient
+            terminoBusqueda = texto;
+            paginaBusqueda = 0;
+            await mostrarPaginaBusqueda();
+        }
+        async function cambiarPaginaBusqueda(direccion) {
+            const nuevaPagina = paginaBusqueda + direccion;
+            if (buscandoPagina || !terminoBusqueda || nuevaPagina < 0) return;
+            paginaBusqueda = nuevaPagina;
+            if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+            await mostrarPaginaBusqueda();
+        }
+        async function mostrarPaginaBusqueda() {
+            if (buscandoPagina) return; // evita toques repetidos mientras carga
+            buscandoPagina = true;
+            try {
+            const texto = terminoBusqueda;
+            const contenedorResultados = document.getElementById('search-results');
+            const paginacion = document.getElementById('search-pagination');
+            const desde = paginaBusqueda * RESULTADOS_POR_PAGINA;
+            const { data: filas, error } = await supabaseClient
                 .from('config_historia')
                 .select('historia_id, titulo_historia, autor')
                 .eq('estado', 'publico')
                 .or(`titulo_historia.ilike.%${texto}%,autor.ilike.%${texto}%`)
-                .limit(5);
+                .order('titulo_historia', { ascending: true })
+                .order('historia_id', { ascending: true })
+                .range(desde, desde + RESULTADOS_POR_PAGINA);
+            contenedorResultados.innerHTML = '';
+            paginacion.style.display = 'none';
             if (error) {
                 console.error("Error en búsqueda:", error);
                 contenedorResultados.innerHTML = `<div style="text-align: center; color: #d9534f; font-size: 12px; padding: 4px;">Ocurrió un error al realizar la búsqueda.</div>`;
                 return;
             }
-            if (data && data.length > 0) {
+            if (filas && filas.length > 0) {
+                const hayMas = filas.length > RESULTADOS_POR_PAGINA;
+                const data = filas.slice(0, RESULTADOS_POR_PAGINA);
                 data.forEach(libro => {
                     const item = document.createElement('div');
                     item.className = 'search-result-item';
@@ -471,8 +512,17 @@
                     };
                     contenedorResultados.appendChild(item);
                 });
+                // Las flechas solo aparecen si hay más de 4 resultados en total
+                if (paginaBusqueda > 0 || hayMas) {
+                    paginacion.style.display = 'flex';
+                    document.getElementById('search-prev').style.visibility = paginaBusqueda > 0 ? 'visible' : 'hidden';
+                    document.getElementById('search-next').style.visibility = hayMas ? 'visible' : 'hidden';
+                }
             } else {
                 contenedorResultados.innerHTML = `<div style="text-align: center; color: #856404; font-size: 12px; padding: 8px; background: #fff3cd; border-radius: 6px;">No encontramos este título o autor. ¡Pronto podríamos agregarlo!</div>`;
+            }
+            } finally {
+                buscandoPagina = false;
             }
         }
         function verificarParametroHistoria() {
