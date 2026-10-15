@@ -504,7 +504,7 @@
                     contenedorResultados.appendChild(item);
                 });
             } else {
-                contenedorResultados.innerHTML = `<div style="text-align: center; color: #856404; font-size: 12px; padding: 8px; background: #fff3cd; border-radius: 6px;">No encontramos هذا título o autor. ¡Pronto podríamos agregarlo!</div>`;
+                contenedorResultados.innerHTML = `<div style="text-align: center; color: #856404; font-size: 12px; padding: 8px; background: #fff3cd; border-radius: 6px;">No encontramos este título o autor. ¡Pronto podríamos agregarlo!</div>`;
             }
         }
 
@@ -543,37 +543,26 @@
             contenedor.innerHTML = htmlBarritas;
         }
 
-        // Selección robusta en JavaScript (Ultra eficiente para los 5 GB y sin fallos con pocos libros)
+        // FUNCIÓN RPC ULTRA EFICIENTE: Supabase hace todo en la nube y devuelve UN SOLO ID
         async function obtenerIdHistoriaAleatoriaNoVista() {
             if (historiaActualId) {
                 historiasVistas.add(historiaActualId);[cite: 55]
             }
 
-            const { data, error } = await supabaseClient
-                .from('config_historia')
-                .select('historia_id')
-                .eq('estado', 'publico');
+            const idsExcluidos = Array.from(historiasVistas);[cite: 55]
 
-            if (error || !data || data.length === 0) {
-                return null;
+            const { data, error } = await supabaseClient.rpc('obtener_historia_aleatoria', {
+                ids_excluidos: idsExcluidos
+            });
+
+            // Si se acaban las historias o hay error, reiniciamos el ciclo de vistas limpiando el Set
+            if (error || !data) {
+                historiasVistas.clear();[cite: 55]
+                if (historiaActualId) historiasVistas.add(historiaActualId);[cite: 55]
+                return obtenerIdHistoriaAleatoriaNoVista();
             }
 
-            // Filtramos localmente las que no se han visto y evitamos la actual
-            let disponibles = data.filter(h => !historiasVistas.has(h.historia_id) && h.historia_id !== historiaActualId);
-
-            // Si ya se recorrieron todas, reiniciamos el ciclo limpiando el Set
-            if (disponibles.length === 0) {
-                historiasVistas.clear();
-                if (historiaActualId) historiasVistas.add(historiaActualId);
-                disponibles = data.filter(h => h.historia_id !== historiaActualId);
-            }
-
-            if (disponibles.length === 0) {
-                return data[0].historia_id;
-            }
-
-            const randomIndex = Math.floor(Math.random() * disponibles.length);
-            return disponibles[randomIndex].historia_id;
+            return data; // Devuelve estrictamente un solo ID (ej: "historia_2")
         }
 
         async function cambiarHistoriaAdyacente(direccion) {
@@ -760,7 +749,7 @@
 
             if (error || !capituloData) return;
 
-            // CORRECCIÓN CLAVE: La imagen solo cambia cuando los datos de Supabase se cargaron con éxito
+            // Sincronización perfecta: la imagen cambia solo al llegar los datos correctos
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
 
             const elementoTitulo = document.getElementById('titulo');
