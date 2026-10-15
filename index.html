@@ -466,9 +466,8 @@
                         document.getElementById('otras-historias').style.display = 'none';
                         document.getElementById('progress-bars-container').style.display = 'flex';
                         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-                        await cargarConfiguracionHistoria(historiaActualId);
-                        await actualizarEstadisticasComunidad();
-                        await cargarCapitulo(capituloActualId);
+                        const historiaCargada = await cargarConfiguracionHistoria(historiaActualId);
+                        await cargarCapitulo(capituloActualId, historiaCargada && historiaCargada.cap_1);
                     };
                     contenedorResultados.appendChild(item);
                 });
@@ -512,88 +511,55 @@
             }
             contenedor.innerHTML = htmlBarritas;
         }
-     // SELECCIÓN ALEATORIA ULTRALIGERA: no descarga la lista de historias.
-     // 1) Un conteo con head:true (solo un número, sin filas).
-     // 2) UNA sola fila al azar (solo la columna historia_id), distinta de la actual.
-     async function cambiarHistoriaAdyacente(direccion) {
-        if (cambiarHistoriaAdyacente.enCurso) return; // evita clics solapados
-        cambiarHistoriaAdyacente.enCurso = true;
+        // SELECCIÓN ALEATORIA ULTRALIGERA: UNA sola petición a la base (función obtener_historia_aleatoria).
+        // Devuelve solo la historia elegida (título, autor, total de capítulos, estrellas y capítulo 1).
+        // Nunca se descarga la lista de historias, sin importar cuántas existan.
+        async function cambiarHistoriaAdyacente(direccion) {
+            if (cambiarHistoriaAdyacente.enCurso) return; // evita clics solapados
+            cambiarHistoriaAdyacente.enCurso = true;
+            try {
+                limpiarBuscador();
+                const { data, error } = await supabaseClient
+                    .rpc('obtener_historia_aleatoria', { p_excluir: historiaActualId || null });
+                if (error || !data) return; // no hay otra historia a la que ir
 
-        try {
-          limpiarBuscador();
+                historiaActualId = data.historia_id;
+                capituloActualId = 'cap_1';
+                pasoActualIndex = 0;
+                document.getElementById('progress-bars-container').style.display = 'flex';
 
-          let consultaConteo = supabaseClient
-            .from('config_historia')
-            .select('historia_id', { count: 'exact', head: true })
-            .eq('estado', 'publico');
-          if (historiaActualId) consultaConteo = consultaConteo.neq('historia_id', historiaActualId);
+                if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
 
-          const { count, error: errorConteo } = await consultaConteo;
-          if (errorConteo || !count) return; // no hay otra historia a la que ir
-
-          const randomIndex = Math.floor(Math.random() * count);
-
-          let consultaFila = supabaseClient
-            .from('config_historia')
-            .select('historia_id')
-            .eq('estado', 'publico');
-          if (historiaActualId) consultaFila = consultaFila.neq('historia_id', historiaActualId);
-
-          const { data, error } = await consultaFila
-            .order('historia_id', { ascending: true })
-            .range(randomIndex, randomIndex);
-
-          if (error || !data || data.length === 0) return;
-
-          historiaActualId = data[0].historia_id;
-
-          capituloActualId = 'cap_1';
-          pasoActualIndex = 0;
-          document.getElementById('progress-bars-container').style.display = 'flex';
-
-          if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
-
-          await cargarConfiguracionHistoria(historiaActualId);
-          await actualizarEstadisticasComunidad();
-          await cargarCapitulo(capituloActualId);
-        } finally {
-          cambiarHistoriaAdyacente.enCurso = false;
+                aplicarConfigHistoria(data);
+                await cargarCapitulo(capituloActualId, data.cap_1);
+            } finally {
+                cambiarHistoriaAdyacente.enCurso = false;
+            }
         }
-    }
 
+        // Pinta título, autor, total de capítulos y estrellas con los datos que ya trae la historia
+        function aplicarConfigHistoria(h) {
+            autorActualNombre = h.autor || 'Desconocido';
+            if (h.total_capitulos && h.total_capitulos > 0) {
+                totalPasosHistoria = h.total_capitulos;
+            }
+            document.getElementById('story-title-author').innerText = h.titulo_historia;
+            document.getElementById('story-author-name').innerText = `Autor: ${autorActualNombre}`;
+            pintarEstadisticas(h.votos, h.suma);
+        }
+
+        // UNA sola petición: configuración + estadísticas + capítulo 1 de una historia concreta
         async function cargarConfiguracionHistoria(hId) {
-            const { count, error } = await supabaseClient
-                .from('capitulos')
-                .select('*', { count: 'exact', head: true })
-                .eq('historia_id', hId);
-            if (!error && count && count > 0) {
-                totalPasosHistoria = count;
-            }
-            const { data: configData } = await supabaseClient
-                .from('config_historia')
-                .select('*')
-                .eq('historia_id', hId)
-                .maybeSingle();
-            if (configData) {
-                autorActualNombre = configData.autor || 'Desconocido';
-                document.getElementById('story-title-author').innerText = configData.titulo_historia;
-                document.getElementById('story-author-name').innerText = `Autor: ${autorActualNombre}`;
-            }
-        }
-        async function actualizarEstadisticasComunidad() {
             const { data, error } = await supabaseClient
-                .from('promedios_globales')
-                .select('*')
-                .eq('historia_id', historiaActualId)
-                .maybeSingle();
-            if (error || !data) {
-                document.getElementById('avg-rating-num').innerText = '0.0';
-                document.getElementById('avg-stars-icon').innerText = '☆☆☆☆☆';
-                document.getElementById('total-ratings-count').innerText = '(0)';
-                return;
-            }
-            let totalVotos = data.total_votos_estrellas || 0;
-            let sumaEstrellas = data.suma_estrellas || 0;
+                .rpc('obtener_historia', { p_historia: hId });
+            if (error || !data) return null;
+            aplicarConfigHistoria(data);
+            return data;
+        }
+
+        function pintarEstadisticas(votos, suma) {
+            let totalVotos = votos || 0;
+            let sumaEstrellas = suma || 0;
             let promedio = totalVotos > 0 ? (sumaEstrellas / totalVotos).toFixed(1) : '0.0';
             document.getElementById('avg-rating-num').innerText = promedio;
             document.getElementById('total-ratings-count').innerText = `(${totalVotos})`;
@@ -601,36 +567,13 @@
             let estrellasStr = '★'.repeat(numEstrellasEnteras) + '☆'.repeat(5 - numEstrellasEnteras);
             document.getElementById('avg-stars-icon').innerText = estrellasStr;
         }
+
         async function registrarVotoEstrellas(calificacion) {
-            const { data: actual } = await supabaseClient
-                .from('promedios_globales')
-                .select('*')
-                .eq('historia_id', historiaActualId)
-                .maybeSingle();
-            let errorAccion = null;
-            if (actual) {
-                let nuevoTotalVotos = (actual.total_votos_estrellas || 0) + 1;
-                let nuevaSumaEstrellas = (actual.suma_estrellas || 0) + calificacion;
-                const { error } = await supabaseClient
-                    .from('promedios_globales')
-                    .update({
-                        total_votos_estrellas: nuevoTotalVotos,
-                        suma_estrellas: nuevaSumaEstrellas
-                    })
-                    .eq('historia_id', historiaActualId);
-                errorAccion = error;
-            } else {
-                const { error } = await supabaseClient
-                    .from('promedios_globales')
-                    .insert([{
-                        historia_id: historiaActualId,
-                        total_votos_estrellas: 1,
-                        suma_estrellas: calificacion
-                    }]);
-                errorAccion = error;
-            }
-            if (errorAccion) {
-                console.error("Error al registrar voto:", errorAccion);
+            // El voto se suma de forma atómica en la base (función votar_estrellas)
+            const { data, error } = await supabaseClient
+                .rpc('votar_estrellas', { p_historia: historiaActualId, p_estrellas: calificacion });
+            if (error || !data) {
+                console.error("Error al registrar voto:", error);
                 return;
             }
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
@@ -638,8 +581,9 @@
             if (contenedorVoto) {
                 contenedorVoto.innerHTML = `<div style="font-weight: bold; color: #28a745; padding: 10px;">¡Gracias por tu voto de ${calificacion} estrellas! ⭐</div>`;
             }
-            await actualizarEstadisticasComunidad();
+            pintarEstadisticas(data.votos, data.suma);
         }
+
         async function iniciarApp() {
             const telegramUser = tg.initDataUnsafe?.user;
             const params = new URLSearchParams(window.location.search);
@@ -654,14 +598,14 @@
                 return;
             }
             verificarParametroHistoria();
+            let historiaPrecargada = null;
             if (!historiaActualId) {
-                const { data, error } = await supabaseClient
-                    .from('config_historia')
-                    .select('historia_id')
-                    .eq('estado', 'publico');
-                if (data && data.length > 0) {
-                    const randomIndex = Math.floor(Math.random() * data.length);
-                    historiaActualId = data[randomIndex].historia_id;
+                // Una sola petición: trae solo UNA historia al azar (no la lista completa)
+                const { data } = await supabaseClient
+                    .rpc('obtener_historia_aleatoria', { p_excluir: null });
+                if (data) {
+                    historiaActualId = data.historia_id;
+                    historiaPrecargada = data;
                 }
             }
             if (!historiaActualId) {
@@ -674,32 +618,36 @@
                 return;
             }
             pasoActualIndex = 0;
-            await cargarConfiguracionHistoria(historiaActualId);
-            await actualizarEstadisticasComunidad();
-            await cargarCapitulo(capituloActualId);
+            if (historiaPrecargada) {
+                aplicarConfigHistoria(historiaPrecargada);
+            } else {
+                historiaPrecargada = await cargarConfiguracionHistoria(historiaActualId);
+            }
+            await cargarCapitulo(capituloActualId, historiaPrecargada && historiaPrecargada.cap_1);
         }
         setTimeout(iniciarApp, 500);
-        async function cargarCapitulo(idCapitulo) {
+        async function cargarCapitulo(idCapitulo, capituloPrecargado) {
             document.getElementById('btn_next').style.display = 'none';
             document.getElementById('hint-siguiente').style.display = 'block';
             document.getElementById('otras-historias').style.display = 'none';
             document.getElementById('progress-bars-container').style.display = 'flex';
-            document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
             pasoActualIndex = obtenerIndicePorIdCapitulo(idCapitulo);
             actualizarBarritasProgreso();
-            const { data: opcionesList } = await supabaseClient
-                .from('opciones')
-                .select('*')
-                .eq('historia_id', historiaActualId)
-                .eq('capitulo_id', idCapitulo);
-            const opcionesValidas = opcionesList ? opcionesList.filter(o => o.texto_opcion && o.texto_opcion.trim() !== '' && o.texto_opcion.trim() !== 'EMPTY') : [];
-            const { data: capituloData, error } = await supabaseClient
-                .from('capitulos')
-                .select('*')
-                .eq('historia_id', historiaActualId)
-                .eq('capitulo_id', idCapitulo)
-                .maybeSingle();
-            if (error || !capituloData) return;
+
+            // Capítulo + opciones en UNA sola petición (o ya vienen incluidos con la historia)
+            let capData = capituloPrecargado;
+            if (!capData) {
+                const { data, error } = await supabaseClient
+                    .rpc('obtener_capitulo', { p_historia: historiaActualId, p_capitulo: idCapitulo });
+                if (error || !data) return false; // no se toca imagen ni texto
+                capData = data;
+            }
+            // La imagen cambia junto con el texto, cuando el capítulo ya está listo
+            document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
+
+            const capituloData = capData;
+            const opcionesValidas = capData.opciones || [];
+            const opcionesList = capData.siguiente_por_defecto ? [{ siguiente_capitulo: capData.siguiente_por_defecto }] : [];
             const elementoTitulo = document.getElementById('titulo');
             if (capituloData.titulo && capituloData.titulo.trim() !== '') {
                 elementoTitulo.innerText = capituloData.titulo;
