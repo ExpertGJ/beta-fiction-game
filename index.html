@@ -198,6 +198,7 @@
             display: none;
             margin-top: 10px;
         }
+        /* Buscador perfectamente equilibrado y ajustado */
         .search-section-footer {
             margin-top: 14px;
             padding-top: 4px;
@@ -310,7 +311,7 @@
 <body>
 
     <div class="container" id="app">
-        <!-- Panel Superior -->
+        <!-- Panel Superior: Flecha anterior, Título/Estrellas/Autor y Flecha siguiente -->
         <div class="stats-box" id="stats-panel">
             <button class="nav-arrow" onclick="cambiarHistoriaAdyacente(-1)">&#10094;</button>
             <div class="stats-center">
@@ -325,7 +326,7 @@
             <button class="nav-arrow" onclick="cambiarHistoriaAdyacente(1)">&#10095;</button>
         </div>
 
-        <!-- Reproductor de Música Ambiental -->
+        <!-- Reproductor de Música Ambiental con bucle infinito y flechas laterales -->
         <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin: 5px 0;">
             <audio id="bg-music" preload="none" loop></audio>
             <button class="music-nav-arrow" onclick="cambiarPistaManual(-1)">&#171;</button>
@@ -354,8 +355,9 @@
 
         <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
 
-        <!-- Bloque final exclusivo para buscador y opciones de fin -->
+        <!-- Bloque final exclusivo para calificación, donación y el buscador limpio -->
         <div id="otras-historias" class="stories-box">
+            <!-- Buscador súper limpio y equilibrado al final -->
             <div class="search-section-footer">
                 <div class="search-input-group">
                     <input type="text" id="input-busqueda" class="search-input" placeholder="Buscar libro o autor...">
@@ -382,19 +384,19 @@
         let totalPasosHistoria = 3; 
         let pasoActualIndex = 0; 
         let autorActualNombre = '';
-        let historiasVistas = new Set(); // Control de historias vistas en la sesión[cite: 26]
+        let listaTodasHistorias = [];
 
         const listaMusica = [
             "audio/11145955-mesa-10550.mp3",
-            "audio/40173586-magic-forest-473582.mp3",
             "audio/amarantamusic-i-give-you-my-heart-109346.mp3",
-            "audio/koto-japan-soundtrack-anime-background-japanese-aikoto-10-470649.mp3",
             "audio/leberch-fear-525004.mp3",
+            "audio/leberch-motions-to-dark-mystery-611753.mp3",
             "audio/leberch-reading-books-590361.mp3",
             "audio/pianocafe_kumi-japanese-piano-568759.mp3",
             "audio/renilsonb-fjord-nordic-545826.mp3",
             "audio/the_mountain-suspense-cyberpunk-375986.mp3",
-            "audio/theojt-dark-ambient-121126.mp3"
+            "audio/theojt-dark-ambient-121126.mp3",
+            "audio/u_nhimhor2050-listen-when-you-need-motivation-335127.mp3"
         ];
         
         let indicePistaActual = listaMusica.indexOf("audio/leberch-reading-books-590361.mp3");
@@ -445,6 +447,7 @@
             }
         }
 
+        // Limpiar buscador al cambiar de historia
         function limpiarBuscador() {
             const input = document.getElementById('input-busqueda');
             const resultados = document.getElementById('search-results');
@@ -452,6 +455,7 @@
             if (resultados) resultados.innerHTML = '';
         }
 
+        // Búsqueda ultraligera directa en Supabase
         async function buscarHistoriaSupabase() {
             const texto = document.getElementById('input-busqueda').value.trim();
             const contenedorResultados = document.getElementById('search-results');
@@ -488,7 +492,6 @@
                     `;
                     item.onclick = async () => {
                         historiaActualId = libro.historia_id;
-                        historiasVistas.add(historiaActualId);
                         capituloActualId = 'cap_1';
                         pasoActualIndex = 0;
                         limpiarBuscador();
@@ -521,6 +524,15 @@
             }
         }
 
+        function barajarArreglo(array) {
+            let arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
         function obtenerIndicePorIdCapitulo(idCap) {
             if (idCap === 'fin' || idCap.includes('epilogo')) return totalPasosHistoria - 1;
             const match = idCap.match(/\d+/);
@@ -543,43 +555,35 @@
             contenedor.innerHTML = htmlBarritas;
         }
 
-        // Función optimizada: Obtiene un ID de historia aleatorio que NO se haya visto, consultando solo IDs (cero desperdicio de datos)
-        async function obtenerIdHistoriaAleatoriaNoVista() {
-            let query = supabaseClient
+        async function cargarListaHistoriasGlobal() {
+            const { data } = await supabaseClient
                 .from('config_historia')
-                .select('historia_id')
-                .eq('estado', 'publico');
-
-            const idsExcluidos = Array.from(historiasVistas);
-            if (idsExcluidos.length > 0) {
-                query = query.not('historia_id', 'in', `(${idsExcluidos.join(',')})`);
+                .select('*')
+                .eq('estado', 'publico')
+                .order('id', { ascending: false });
+            if (data) {
+                listaTodasHistorias = data;
             }
-
-            const { data, error } = await query;
-
-            if (error || !data || data.length === 0) {
-                // Si ya se recorrieron todas, se reinicia el ciclo de vistas
-                historiasVistas.clear();
-                return obtenerIdHistoriaAleatoriaNoVista();
-            }
-
-            const randomIndex = Math.floor(Math.random() * data.length);
-            return data[randomIndex].historia_id;
         }
 
         async function cambiarHistoriaAdyacente(direccion) {
             limpiarBuscador();
+            if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
+                await cargarListaHistoriasGlobal();
+            }
+            if (!listaTodasHistorias || listaTodasHistorias.length === 0) return;
 
-            if (historiaActualId) {
-                historiasVistas.add(historiaActualId);
+            let nuevoIndex;
+            if (listaTodasHistorias.length > 1) {
+                do {
+                    nuevoIndex = Math.floor(Math.random() * listaTodasHistorias.length);
+                } while (listaTodasHistorias[nuevoIndex].historia_id === historiaActualId);
+            } else {
+                nuevoIndex = 0;
             }
 
-            const nuevoId = await obtenerIdHistoriaAleatoriaNoVista();
-            if (!nuevoId) return;
-
-            historiaActualId = nuevoId;
-            historiasVistas.add(historiaActualId);
-
+            const nuevaHistoria = listaTodasHistorias[nuevoIndex];
+            historiaActualId = nuevaHistoria.historia_id;
             capituloActualId = 'cap_1';
             pasoActualIndex = 0;
             document.getElementById('progress-bars-container').style.display = 'flex';
@@ -702,12 +706,9 @@
             }
 
             verificarParametroHistoria();
+            await cargarListaHistoriasGlobal();
 
-            if (!historiaActualId) {
-                historiaActualId = await obtenerIdHistoriaAleatoriaNoVista();
-            }
-
-            if (!historiaActualId) {
+            if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
                 document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
                         <h3>No hay historias disponibles</h3>
@@ -717,8 +718,9 @@
                 return;
             }
 
-            if (historiaActualId) {
-                historiasVistas.add(historiaActualId);
+            if (!params.get('historia') && !params.get('startapp') && !startParam) {
+                const randomIndex = Math.floor(Math.random() * listaTodasHistorias.length);
+                historiaActualId = listaTodasHistorias[randomIndex].historia_id;
             }
 
             pasoActualIndex = 0;
@@ -812,13 +814,9 @@
             }
 
             if (opcionesValidas.length > 0) {
-                let arr = [...opcionesValidas];
-                for (let i = arr.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [arr[i], arr[j]] = [arr[j], arr[i]];
-                }
+                const opcionesAleatorias = barajarArreglo(opcionesValidas);
 
-                arr.forEach((opcion) => {
+                opcionesAleatorias.forEach((opcion) => {
                     const btn = document.createElement('button');
                     btn.className = 'btn';
                     btn.innerText = opcion.texto_opcion;
