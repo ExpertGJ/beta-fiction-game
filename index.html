@@ -198,7 +198,6 @@
             display: none;
             margin-top: 10px;
         }
-        /* Buscador perfectamente equilibrado y ajustado */
         .search-section-footer {
             margin-top: 14px;
             padding-top: 4px;
@@ -311,7 +310,7 @@
 <body>
 
     <div class="container" id="app">
-        <!-- Panel Superior: Flecha anterior, Título/Estrellas/Autor y Flecha siguiente -->
+        <!-- Panel Superior -->
         <div class="stats-box" id="stats-panel">
             <button class="nav-arrow" onclick="cambiarHistoriaAdyacente(-1)">&#10094;</button>
             <div class="stats-center">
@@ -326,7 +325,7 @@
             <button class="nav-arrow" onclick="cambiarHistoriaAdyacente(1)">&#10095;</button>
         </div>
 
-        <!-- Reproductor de Música Ambiental con bucle infinito y flechas laterales -->
+        <!-- Reproductor de Música Ambiental -->
         <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin: 5px 0;">
             <audio id="bg-music" preload="none" loop></audio>
             <button class="music-nav-arrow" onclick="cambiarPistaManual(-1)">&#171;</button>
@@ -355,9 +354,8 @@
 
         <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
 
-        <!-- Bloque final exclusivo para calificación, donación y el buscador limpio -->
+        <!-- Bloque final exclusivo para buscador y opciones de fin -->
         <div id="otras-historias" class="stories-box">
-            <!-- Buscador súper limpio y equilibrado al final -->
             <div class="search-section-footer">
                 <div class="search-input-group">
                     <input type="text" id="input-busqueda" class="search-input" placeholder="Buscar libro o autor...">
@@ -384,19 +382,18 @@
         let totalPasosHistoria = 3; 
         let pasoActualIndex = 0; 
         let autorActualNombre = '';
-        let listaTodasHistorias = [];
 
         const listaMusica = [
             "audio/11145955-mesa-10550.mp3",
+            "audio/40173586-magic-forest-473582.mp3",
             "audio/amarantamusic-i-give-you-my-heart-109346.mp3",
+            "audio/koto-japan-soundtrack-anime-background-japanese-aikoto-10-470649.mp3",
             "audio/leberch-fear-525004.mp3",
-            "audio/leberch-motions-to-dark-mystery-611753.mp3",
             "audio/leberch-reading-books-590361.mp3",
             "audio/pianocafe_kumi-japanese-piano-568759.mp3",
             "audio/renilsonb-fjord-nordic-545826.mp3",
             "audio/the_mountain-suspense-cyberpunk-375986.mp3",
-            "audio/theojt-dark-ambient-121126.mp3",
-            "audio/u_nhimhor2050-listen-when-you-need-motivation-335127.mp3"
+            "audio/theojt-dark-ambient-121126.mp3"
         ];
         
         let indicePistaActual = listaMusica.indexOf("audio/leberch-reading-books-590361.mp3");
@@ -447,7 +444,6 @@
             }
         }
 
-        // Limpiar buscador al cambiar de historia
         function limpiarBuscador() {
             const input = document.getElementById('input-busqueda');
             const resultados = document.getElementById('search-results');
@@ -455,7 +451,6 @@
             if (resultados) resultados.innerHTML = '';
         }
 
-        // Búsqueda ultraligera directa en Supabase
         async function buscarHistoriaSupabase() {
             const texto = document.getElementById('input-busqueda').value.trim();
             const contenedorResultados = document.getElementById('search-results');
@@ -502,7 +497,7 @@
 
                         await cargarConfiguracionHistoria(historiaActualId);
                         await actualizarEstadisticasComunidad();
-                        cargarCapitulo(capituloActualId);
+                        await cargarCapitulo(capituloActualId);
                     };
                     contenedorResultados.appendChild(item);
                 });
@@ -555,35 +550,20 @@
             contenedor.innerHTML = htmlBarritas;
         }
 
-        async function cargarListaHistoriasGlobal() {
-            const { data } = await supabaseClient
-                .from('config_historia')
-                .select('*')
-                .eq('estado', 'publico')
-                .order('id', { ascending: false });
-            if (data) {
-                listaTodasHistorias = data;
-            }
-        }
-
+        // SELECCIÓN ALEATORIA ULTRALIGERA: Solo pide IDs (cero descarga masiva de datos)
         async function cambiarHistoriaAdyacente(direccion) {
             limpiarBuscador();
-            if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
-                await cargarListaHistoriasGlobal();
-            }
-            if (!listaTodasHistorias || listaTodasHistorias.length === 0) return;
 
-            let nuevoIndex;
-            if (listaTodasHistorias.length > 1) {
-                do {
-                    nuevoIndex = Math.floor(Math.random() * listaTodasHistorias.length);
-                } while (listaTodasHistorias[nuevoIndex].historia_id === historiaActualId);
-            } else {
-                nuevoIndex = 0;
-            }
+            const { data, error } = await supabaseClient
+                .from('config_historia')
+                .select('historia_id')
+                .eq('estado', 'publico');
 
-            const nuevaHistoria = listaTodasHistorias[nuevoIndex];
-            historiaActualId = nuevaHistoria.historia_id;
+            if (error || !data || data.length === 0) return;
+
+            const randomIndex = Math.floor(Math.random() * data.length);
+            historiaActualId = data[randomIndex].historia_id;
+
             capituloActualId = 'cap_1';
             pasoActualIndex = 0;
             document.getElementById('progress-bars-container').style.display = 'flex';
@@ -592,7 +572,7 @@
 
             await cargarConfiguracionHistoria(historiaActualId);
             await actualizarEstadisticasComunidad();
-            cargarCapitulo(capituloActualId);
+            await cargarCapitulo(capituloActualId);
         }
 
         async function cargarConfiguracionHistoria(hId) {
@@ -706,9 +686,20 @@
             }
 
             verificarParametroHistoria();
-            await cargarListaHistoriasGlobal();
 
-            if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
+            if (!historiaActualId) {
+                const { data, error } = await supabaseClient
+                    .from('config_historia')
+                    .select('historia_id')
+                    .eq('estado', 'publico');
+
+                if (data && data.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * data.length);
+                    historiaActualId = data[randomIndex].historia_id;
+                }
+            }
+
+            if (!historiaActualId) {
                 document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
                         <h3>No hay historias disponibles</h3>
@@ -718,15 +709,10 @@
                 return;
             }
 
-            if (!params.get('historia') && !params.get('startapp') && !startParam) {
-                const randomIndex = Math.floor(Math.random() * listaTodasHistorias.length);
-                historiaActualId = listaTodasHistorias[randomIndex].historia_id;
-            }
-
             pasoActualIndex = 0;
             await cargarConfiguracionHistoria(historiaActualId);
             await actualizarEstadisticasComunidad();
-            cargarCapitulo(capituloActualId);
+            await cargarCapitulo(capituloActualId);
         }
 
         setTimeout(iniciarApp, 500);
@@ -738,6 +724,7 @@
             document.getElementById('progress-bars-container').style.display = 'flex';
             
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
+
             pasoActualIndex = obtenerIndicePorIdCapitulo(idCapitulo);
             actualizarBarritasProgreso();
 
@@ -802,7 +789,7 @@
 
                     <div class="donation-box">
                         <div class="donation-text">
-                            Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
+                            Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nosso canal.
                         </div>
                         <button class="btn-channel" onclick="abrirCanalRegalos()">Ver Canal</button>
                     </div>
@@ -815,7 +802,6 @@
 
             if (opcionesValidas.length > 0) {
                 const opcionesAleatorias = barajarArreglo(opcionesValidas);
-
                 opcionesAleatorias.forEach((opcion) => {
                     const btn = document.createElement('button');
                     btn.className = 'btn';
