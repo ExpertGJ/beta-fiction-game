@@ -488,7 +488,7 @@
                     `;
                     item.onclick = async () => {
                         historiaActualId = libro.historia_id;
-                        historiasVistas.add(historiaActualId);
+                        historiasVistas.add(historiaActualId);[cite: 26]
                         capituloActualId = 'cap_1';
                         pasoActualIndex = 0;
                         limpiarBuscador();
@@ -499,7 +499,7 @@
 
                         await cargarConfiguracionHistoria(historiaActualId);
                         await actualizarEstadisticasComunidad();
-                        cargarCapitulo(capituloActualId);
+                        await cargarCapitulo(capituloActualId);
                     };
                     contenedorResultados.appendChild(item);
                 });
@@ -546,7 +546,7 @@
         // Selección ultraligera y sincronizada por demanda (protege los 5 GB de Supabase)
         async function obtenerIdHistoriaAleatoriaNoVista() {
             if (historiaActualId) {
-                historiasVistas.add(historiaActualId);
+                historiasVistas.add(historiaActualId);[cite: 26]
             }
 
             let query = supabaseClient
@@ -554,7 +554,7 @@
                 .select('historia_id')
                 .eq('estado', 'publico');
 
-            const idsExcluidos = Array.from(historiasVistas);
+            const idsExcluidos = Array.from(historiasVistas);[cite: 26]
             if (idsExcluidos.length > 0) {
                 query = query.not('historia_id', 'in', `(${idsExcluidos.join(',')})`);
             }
@@ -562,12 +562,11 @@
             const { data, error } = await query;
 
             if (error || !data || data.length === 0) {
-                historiasVistas.clear();
-                if (historiaActualId) historiasVistas.add(historiaActualId);
+                historiasVistas.clear();[cite: 26]
+                if (historiaActualId) historiasVistas.add(historiaActualId);[cite: 26]
                 return obtenerIdHistoriaAleatoriaNoVista();
             }
 
-            // Excluimos estrictamente el ID actual para evitar repeticiones visuales inmediatas
             const disponibles = data.filter(h => h.historia_id !== historiaActualId);
             
             if (disponibles.length === 0) {
@@ -585,7 +584,7 @@
             if (!nuevoId) return;
 
             historiaActualId = nuevoId;
-            historiasVistas.add(historiaActualId);
+            historiasVistas.add(historiaActualId);[cite: 26]
 
             capituloActualId = 'cap_1';
             pasoActualIndex = 0;
@@ -710,28 +709,35 @@
 
             verificarParametroHistoria();
 
-            if (!historiaActualId) {
-                historiaActualId = await obtenerIdHistoriaAleatoriaNoVista();
-            }
+            // Mensaje visual de carga inicial para evitar bloqueos en blanco
+            document.getElementById('pregunta').innerText = "Cargando aventura aleatoria...";
 
-            if (!historiaActualId) {
-                document.getElementById('app').innerHTML = `
-                    <div class="blocked-card">
-                        <h3>No hay historias disponibles</h3>
-                        <p>Vuelve más tarde para disfrutar de nuevas aventuras.</p>
-                    </div>
-                `;
-                return;
-            }
+            try {
+                if (!historiaActualId) {
+                    historiaActualId = await obtenerIdHistoriaAleatoriaNoVista();
+                }
 
-            if (historiaActualId) {
-                historiasVistas.add(historiaActualId);
-            }
+                if (!historiaActualId) {
+                    document.getElementById('app').innerHTML = `
+                        <div class="blocked-card">
+                            <h3>No hay historias disponibles</h3>
+                            <p>Vuelve más tarde para disfrutar de nuevas aventuras.</p>
+                        </div>
+                    `;
+                    return;
+                }
 
-            pasoActualIndex = 0;
-            await cargarConfiguracionHistoria(historiaActualId);
-            await actualizarEstadisticasComunidad();
-            cargarCapitulo(capituloActualId);
+                historiasVistas.add(historiaActualId);[cite: 26]
+                pasoActualIndex = 0;
+
+                await cargarConfiguracionHistoria(historiaActualId);
+                await actualizarEstadisticasComunidad();
+                await cargarCapitulo(capituloActualId);
+
+            } catch (error) {
+                console.error("Error al iniciar la app:", error);
+                document.getElementById('pregunta').innerText = "Hubo un error al conectar con el servidor. Revisa tu conexión.";
+            }
         }
 
         setTimeout(iniciarApp, 500);
@@ -809,7 +815,7 @@
 
                     <div class="donation-box">
                         <div class="donation-text">
-                            Mantener هذا espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
+                            Mantener este espacio vivo requiere tiempo y recursos. Apóyanos ahora mismo enviando un regalo a nuestro canal.
                         </div>
                         <button class="btn-channel" onclick="abrirCanalRegalos()">Ver Canal</button>
                     </div>
