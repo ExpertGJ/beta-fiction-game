@@ -435,12 +435,16 @@
                 if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
             }
         }
-        // Buscador paginado: máximo 4 resultados por página.
-        // Se piden 5 filas (4 + 1) solo para saber si existe una página siguiente, sin contar toda la tabla.
-        const RESULTADOS_POR_PAGINA = 4;
+        // Buscador paginado: máximo 4 resultados por página (la función buscar_historias de Supabase
+        // hace el trabajo: ignora mayúsculas y tildes, usa índices y avisa si hay página siguiente).
+        const MIN_CARACTERES_BUSQUEDA = 3;
         let terminoBusqueda = '';
         let paginaBusqueda = 0;
         let buscandoPagina = false;
+
+        function escaparHtml(t) {
+            return String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
 
         function limpiarBuscador() {
             const input = document.getElementById('input-busqueda');
@@ -457,8 +461,8 @@
             const contenedorResultados = document.getElementById('search-results');
             contenedorResultados.innerHTML = '';
             document.getElementById('search-pagination').style.display = 'none';
-            if (!texto) {
-                contenedorResultados.innerHTML = `<div style="text-align: center; color: #666; font-size: 12px; padding: 4px;">Escribe el nombre de un libro o autor.</div>`;
+            if (texto.length < MIN_CARACTERES_BUSQUEDA) {
+                contenedorResultados.innerHTML = `<div style="text-align: center; color: #666; font-size: 12px; padding: 4px;">Escribe al menos ${MIN_CARACTERES_BUSQUEDA} letras del título o del autor.</div>`;
                 return;
             }
             terminoBusqueda = texto;
@@ -479,32 +483,25 @@
             const texto = terminoBusqueda;
             const contenedorResultados = document.getElementById('search-results');
             const paginacion = document.getElementById('search-pagination');
-            const desde = paginaBusqueda * RESULTADOS_POR_PAGINA;
-            const { data: filas, error } = await supabaseClient
-                .from('config_historia')
-                .select('historia_id, titulo_historia, autor')
-                .eq('estado', 'publico')
-                .or(`titulo_historia.ilike.%${texto}%,autor.ilike.%${texto}%`)
-                .order('titulo_historia', { ascending: true })
-                .order('historia_id', { ascending: true })
-                .range(desde, desde + RESULTADOS_POR_PAGINA);
+            const { data: res, error } = await supabaseClient
+                .rpc('buscar_historias', { p_texto: texto, p_pagina: paginaBusqueda });
             contenedorResultados.innerHTML = '';
             paginacion.style.display = 'none';
-            if (error) {
+            if (error || !res) {
                 console.error("Error en búsqueda:", error);
                 contenedorResultados.innerHTML = `<div style="text-align: center; color: #d9534f; font-size: 12px; padding: 4px;">Ocurrió un error al realizar la búsqueda.</div>`;
                 return;
             }
-            if (filas && filas.length > 0) {
-                const hayMas = filas.length > RESULTADOS_POR_PAGINA;
-                const data = filas.slice(0, RESULTADOS_POR_PAGINA);
+            const data = (res && res.items) ? res.items : [];
+            if (data.length > 0) {
+                const hayMas = !!res.hay_mas;
                 data.forEach(libro => {
                     const item = document.createElement('div');
                     item.className = 'search-result-item';
                     item.innerHTML = `
                         <div>
-                            <div style="font-weight: bold; color: #2481cc;">${libro.titulo_historia}</div>
-                            <div style="font-size: 11px; color: #666;">Autor: ${libro.autor || 'Desconocido'}</div>
+                            <div style="font-weight: bold; color: #2481cc;">${escaparHtml(libro.titulo_historia)}</div>
+                            <div style="font-size: 11px; color: #666;">Autor: ${escaparHtml(libro.autor || 'Desconocido')}</div>
                         </div>
                         <span style="font-size: 12px; font-weight: bold; color: #28a745;">Leer ➔</span>
                     `;
