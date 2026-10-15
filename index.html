@@ -382,8 +382,7 @@
         let totalPasosHistoria = 3; 
         let pasoActualIndex = 0; 
         let autorActualNombre = '';
-        let listaTodasHistorias = [];
-        let historiasVistas = new Set(); // Control de historias vistas en la sesión
+        let historiasVistas = new Set(); // Control de historias vistas en la sesión[cite: 26]
 
         const listaMusica = [
             "audio/11145955-mesa-10550.mp3",
@@ -544,44 +543,41 @@
             contenedor.innerHTML = htmlBarritas;
         }
 
-        async function cargarListaHistoriasGlobal() {
-            const { data } = await supabaseClient
+        // Función optimizada: Obtiene un ID de historia aleatorio que NO se haya visto, consultando solo IDs (cero desperdicio de datos)
+        async function obtenerIdHistoriaAleatoriaNoVista() {
+            let query = supabaseClient
                 .from('config_historia')
-                .select('*')
-                .eq('estado', 'publico')
-                .order('id', { ascending: false });
-            if (data) {
-                listaTodasHistorias = data;
+                .select('historia_id')
+                .eq('estado', 'publico');
+
+            const idsExcluidos = Array.from(historiasVistas);
+            if (idsExcluidos.length > 0) {
+                query = query.not('historia_id', 'in', `(${idsExcluidos.join(',')})`);
             }
+
+            const { data, error } = await query;
+
+            if (error || !data || data.length === 0) {
+                // Si ya se recorrieron todas, se reinicia el ciclo de vistas
+                historiasVistas.clear();
+                return obtenerIdHistoriaAleatoriaNoVista();
+            }
+
+            const randomIndex = Math.floor(Math.random() * data.length);
+            return data[randomIndex].historia_id;
         }
 
         async function cambiarHistoriaAdyacente(direccion) {
             limpiarBuscador();
-            if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
-                await cargarListaHistoriasGlobal();
-            }
-            if (!listaTodasHistorias || listaTodasHistorias.length === 0) return;
 
             if (historiaActualId) {
                 historiasVistas.add(historiaActualId);
             }
 
-            let historiasDisponibles = listaTodasHistorias.filter(h => !historiasVistas.has(h.historia_id));
+            const nuevoId = await obtenerIdHistoriaAleatoriaNoVista();
+            if (!nuevoId) return;
 
-            if (historiasDisponibles.length === 0) {
-                historiasVistas.clear();
-                if (historiaActualId) historiasVistas.add(historiaActualId);
-                historiasDisponibles = listaTodasHistorias.filter(h => !historiasVistas.has(h.historia_id));
-            }
-
-            if (historiasDisponibles.length === 0) {
-                historiasDisponibles = listaTodasHistorias;
-            }
-
-            const nuevoIndex = Math.floor(Math.random() * historiasDisponibles.length);
-            const nuevaHistoria = historiasDisponibles[nuevoIndex];
-
-            historiaActualId = nuevaHistoria.historia_id;
+            historiaActualId = nuevoId;
             historiasVistas.add(historiaActualId);
 
             capituloActualId = 'cap_1';
@@ -706,9 +702,12 @@
             }
 
             verificarParametroHistoria();
-            await cargarListaHistoriasGlobal();
 
-            if (!listaTodasHistorias || listaTodasHistorias.length === 0) {
+            if (!historiaActualId) {
+                historiaActualId = await obtenerIdHistoriaAleatoriaNoVista();
+            }
+
+            if (!historiaActualId) {
                 document.getElementById('app').innerHTML = `
                     <div class="blocked-card">
                         <h3>No hay historias disponibles</h3>
@@ -716,11 +715,6 @@
                     </div>
                 `;
                 return;
-            }
-
-            if (!params.get('historia') && !params.get('startapp') && !startParam) {
-                const randomIndex = Math.floor(Math.random() * listaTodasHistorias.length);
-                historiaActualId = listaTodasHistorias[randomIndex].historia_id;
             }
 
             if (historiaActualId) {
