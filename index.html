@@ -392,6 +392,14 @@
         const CACHE_PREFIJO = 'br' + CACHE_VERSION + '_h_';
         const CLAVE_INDICE = 'br' + CACHE_VERSION + '_idx';   // historia -> última vez usada
         const CLAVE_VOTOS = 'br_votos';                       // los votos nunca se invalidan
+        // Votos y promedio: se actualizan solo cuando el usuario LLEGA a una historia guardada
+        // (flechas, buscador o enlace) y han pasado al menos estos minutos desde la última actualización.
+        // Los votos nuevos se esperan ANTES de mostrar la historia, para que todo aparezca junto y
+        // cuadrado. Si la respuesta tarda más de ESPERA_MAX_VOTOS_MS, se muestra lo guardado sin esperar más.
+        const MINUTOS_REFRESCO_VOTOS = 5;
+        const ESPERA_MAX_VOTOS_MS = 2500;
+        const tvMemoria = {};      // historia -> momento en que sus votos estaban al día
+        const votosEnCurso = {};   // historia -> petición de votos en curso (evita duplicadas)
 
         function cacheLeerIndice() {
             try { return JSON.parse(localStorage.getItem(CLAVE_INDICE) || '{}') || {}; } catch (e) { return {}; }
@@ -450,6 +458,8 @@
             const { cap_1, ...cfg } = data;
             const e = cacheLeerHistoria(data.historia_id) || { t: Date.now(), caps: {} };
             e.cfg = cfg;
+            e.tv = Date.now();                       // votos recién descargados = al día
+            tvMemoria[data.historia_id] = e.tv;
             if (cap_1) e.caps.cap_1 = cap_1;
             cacheGuardarHistoria(data.historia_id, e);
         }
@@ -470,6 +480,23 @@
             if (error || !data) return null;
             cacheGuardarDesdeHistoria(data);
             return data;
+        }
+        // Borra TODA la memoria local de la app (historias, votos recordados y vistas recientes).
+        // Se activa abriendo la app con el enlace  https://t.me/BetaReadsBot?startapp=limpiar
+        function borrarMemoriaLocal() {
+            try {
+                const claves = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k && k.startsWith('br')) claves.push(k);
+                }
+                claves.forEach(k => localStorage.removeItem(k));
+            } catch (e) {}
+            vistasRecientes = [];
+            historialHistorias = [];
+            indiceHistorial = -1;
+            Object.keys(tvMemoria).forEach(k => delete tvMemoria[k]);
+            if (tg.showAlert) { try { tg.showAlert('Memoria local borrada. Se descargará todo de nuevo.'); } catch (e) {} }
         }
         // Al arrancar: elimina lo guardado por versiones antiguas de la memoria local
         function cacheLimpiarVersionesAntiguas() {
@@ -661,6 +688,10 @@
             if (!historiaParam && tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
                 historiaParam = tg.initDataUnsafe.start_param;
             }
+            if (historiaParam === 'limpiar') {   // palabra reservada: borra la memoria local y abre una historia al azar
+                borrarMemoriaLocal();
+                historiaParam = '';
+            }
             if (historiaParam) {
                 historiaActualId = historiaParam;
             }
@@ -692,6 +723,52 @@
             contenedor.innerHTML = htmlBarritas;
         }
 
+        // Votos y promedio de una historia guardada
+        function momentoVotosAlDia(hId) {
+            const e = cacheLeerHistoria(hId);
+            return Math.max(tvMemoria[hId] || 0, (e && e.tv) || 0);
+        }
+        // Pide los votos (una sola petición aunque se llame varias veces). No pinta nada:
+        // guarda el resultado en la memoria local y lo devuelve ({votos, suma}) o null si falla.
+        function solicitarVotos(hId) {
+            if (votosEnCurso[hId]) return votosEnCurso[hId];
+            const promesa = (async () => {
+                await null; // garantiza que la petición queda registrada antes de terminar
+                try {
+                    const { data, error } = await supabaseClient.rpc('obtener_votos', { p_historia: hId });
+                    if (error || !data) return null;
+                    const ahora = Date.now();
+                    tvMemoria[hId] = ahora;
+                    const e = cacheLeerHistoria(hId);
+                    if (e) {
+                        if (e.cfg) { e.cfg.votos = data.votos; e.cfg.suma = data.suma; }
+                        e.tv = ahora;
+                        cacheGuardarHistoria(hId, e);
+                    }
+                    const hEnMemoria = historialHistorias.find(x => x.historia_id === hId);
+                    if (hEnMemoria) { hEnMemoria.votos = data.votos; hEnMemoria.suma = data.suma; }
+                    return data;
+                } catch (err) {
+                    console.error("Error al actualizar votos:", err);
+                    return null;
+                } finally {
+                    votosEnCurso[hId] = null;
+                }
+            })();
+            votosEnCurso[hId] = promesa;
+            return promesa;
+        }
+        // Se llama ANTES de pintar una historia que ya estaba guardada: si sus votos caducaron,
+        // espera los nuevos (máximo ESPERA_MAX_VOTOS_MS) y los pone en h para que se pinte todo junto.
+        async function actualizarVotosAntesDeMostrar(h) {
+            if (!h || !h.historia_id) return;
+            const hId = h.historia_id;
+            if (Date.now() - momentoVotosAlDia(hId) < MINUTOS_REFRESCO_VOTOS * 60000) return; // ya al día
+            const limite = new Promise(resolve => setTimeout(() => resolve(null), ESPERA_MAX_VOTOS_MS));
+            const datos = await Promise.race([solicitarVotos(hId), limite]);
+            if (datos) { h.votos = datos.votos; h.suma = datos.suma; }
+        }
+
         // ---------- SELECCIÓN PONDERADA (40% recientes / 60% resto) ----------
         // La elección se hace dentro de Supabase (función obtener_historia_ponderada):
         // UNA sola petición por historia nueva, nunca se descarga la lista.
@@ -720,6 +797,7 @@
         }
 
         async function mostrarHistoria(data) {
+            await actualizarVotosAntesDeMostrar(data); // si hace falta, los votos llegan antes de pintar
             historiaActualId = data.historia_id;
             capituloActualId = 'cap_1';
             pasoActualIndex = 0;
@@ -769,6 +847,7 @@
         async function cargarConfiguracionHistoria(hId) {
             const data = await obtenerHistoriaConCache(hId);
             if (!data) return null;
+            await actualizarVotosAntesDeMostrar(data); // votos nuevos antes de pintar, si caducaron
             aplicarConfigHistoria(data);
             return data;
         }
@@ -802,8 +881,10 @@
             if (eVoto && eVoto.cfg) {
                 eVoto.cfg.votos = data.votos;
                 eVoto.cfg.suma = data.suma;
+                eVoto.tv = Date.now();
                 cacheGuardarHistoria(hVotada, eVoto);
             }
+            tvMemoria[hVotada] = Date.now();
             const hEnMemoria = historialHistorias.find(x => x.historia_id === hVotada);
             if (hEnMemoria) { hEnMemoria.votos = data.votos; hEnMemoria.suma = data.suma; }
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
