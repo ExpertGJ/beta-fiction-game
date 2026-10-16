@@ -382,6 +382,129 @@
         let vistasRecientes = [];
         try { vistasRecientes = JSON.parse(localStorage.getItem('br_vistas') || '[]'); } catch (e) { vistasRecientes = []; }
 
+        // ---------- MEMORIA LOCAL DEL TELÉFONO (ahorra tráfico) ----------
+        // Cada historia leída se guarda con sus capítulos; al volver a leerla no se descarga nada.
+        // CACHE_VERSION: si corriges o cambias capítulos en Supabase, sube este número (1 -> 2) y
+        // todos los teléfonos descartan lo guardado y lo vuelven a descargar una sola vez.
+        const CACHE_VERSION = 1;
+        const DIAS_VIGENCIA_CACHE = 30;       // pasado este tiempo, la historia se vuelve a descargar
+        const MAX_VOTOS_GUARDADOS = 3000;
+        const CACHE_PREFIJO = 'br' + CACHE_VERSION + '_h_';
+        const CLAVE_INDICE = 'br' + CACHE_VERSION + '_idx';   // historia -> última vez usada
+        const CLAVE_VOTOS = 'br_votos';                       // los votos nunca se invalidan
+
+        function cacheLeerIndice() {
+            try { return JSON.parse(localStorage.getItem(CLAVE_INDICE) || '{}') || {}; } catch (e) { return {}; }
+        }
+        function cacheEscribirIndice(idx) {
+            try { localStorage.setItem(CLAVE_INDICE, JSON.stringify(idx)); } catch (e) {}
+        }
+        function cacheBorrarHistoria(hId) {
+            try { localStorage.removeItem(CACHE_PREFIJO + hId); } catch (e) {}
+            const idx = cacheLeerIndice();
+            if (idx[hId]) { delete idx[hId]; cacheEscribirIndice(idx); }
+        }
+        function cacheLeerHistoria(hId) {
+            try {
+                const raw = localStorage.getItem(CACHE_PREFIJO + hId);
+                if (!raw) return null;
+                const e = JSON.parse(raw);
+                if (!e || !e.t || !e.caps || (Date.now() - e.t) > DIAS_VIGENCIA_CACHE * 86400000) {
+                    cacheBorrarHistoria(hId);
+                    return null;
+                }
+                return e;
+            } catch (err) { return null; }
+        }
+        // Si el teléfono se queda sin espacio, borra el 25% de historias menos usadas
+        function cacheLiberarEspacio() {
+            const idx = cacheLeerIndice();
+            const ids = Object.keys(idx).sort((a, b) => idx[a] - idx[b]);
+            if (ids.length === 0) return false;
+            const n = Math.max(1, Math.ceil(ids.length * 0.25));
+            ids.slice(0, n).forEach(id => {
+                try { localStorage.removeItem(CACHE_PREFIJO + id); } catch (e) {}
+                delete idx[id];
+            });
+            cacheEscribirIndice(idx);
+            return true;
+        }
+        function cacheGuardarHistoria(hId, entrada) {
+            const texto = JSON.stringify(entrada);
+            for (let intento = 0; intento < 3; intento++) {
+                try {
+                    localStorage.setItem(CACHE_PREFIJO + hId, texto);
+                    const idx = cacheLeerIndice();
+                    idx[hId] = Date.now();
+                    cacheEscribirIndice(idx);
+                    return true;
+                } catch (e) {
+                    if (!cacheLiberarEspacio()) return false;
+                }
+            }
+            return false;
+        }
+        // Guarda la historia recién descargada (datos + capítulo 1)
+        function cacheGuardarDesdeHistoria(data) {
+            if (!data || !data.historia_id) return;
+            const { cap_1, ...cfg } = data;
+            const e = cacheLeerHistoria(data.historia_id) || { t: Date.now(), caps: {} };
+            e.cfg = cfg;
+            if (cap_1) e.caps.cap_1 = cap_1;
+            cacheGuardarHistoria(data.historia_id, e);
+        }
+        function cacheLeerCapitulo(hId, capId) {
+            const e = cacheLeerHistoria(hId);
+            return (e && e.caps && e.caps[capId]) ? e.caps[capId] : null;
+        }
+        function cacheGuardarCapitulo(hId, capId, cap) {
+            const e = cacheLeerHistoria(hId) || { t: Date.now(), caps: {} };
+            e.caps[capId] = cap;
+            cacheGuardarHistoria(hId, e);
+        }
+        // Devuelve la historia desde la memoria local o, si no está, la descarga (una petición)
+        async function obtenerHistoriaConCache(hId) {
+            const e = cacheLeerHistoria(hId);
+            if (e && e.cfg && e.caps && e.caps.cap_1) return { ...e.cfg, cap_1: e.caps.cap_1 };
+            const { data, error } = await supabaseClient.rpc('obtener_historia', { p_historia: hId });
+            if (error || !data) return null;
+            cacheGuardarDesdeHistoria(data);
+            return data;
+        }
+        // Al arrancar: elimina lo guardado por versiones antiguas de la memoria local
+        function cacheLimpiarVersionesAntiguas() {
+            try {
+                const borrar = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k && /^br\d+_/.test(k) && !k.startsWith('br' + CACHE_VERSION + '_')) borrar.push(k);
+                }
+                borrar.forEach(k => localStorage.removeItem(k));
+            } catch (e) {}
+        }
+
+        // Votos del usuario en este teléfono (historia -> estrellas)
+        function votoLocal(hId) {
+            try { return (JSON.parse(localStorage.getItem(CLAVE_VOTOS) || '{}') || {})[hId] || 0; } catch (e) { return 0; }
+        }
+        function guardarVotoLocal(hId, estrellas) {
+            for (let intento = 0; intento < 2; intento++) {
+                try {
+                    const v = JSON.parse(localStorage.getItem(CLAVE_VOTOS) || '{}') || {};
+                    delete v[hId];
+                    v[hId] = estrellas;
+                    const claves = Object.keys(v);
+                    if (claves.length > MAX_VOTOS_GUARDADOS) {
+                        claves.slice(0, claves.length - MAX_VOTOS_GUARDADOS).forEach(k => delete v[k]);
+                    }
+                    localStorage.setItem(CLAVE_VOTOS, JSON.stringify(v));
+                    return;
+                } catch (e) {
+                    cacheLiberarEspacio(); // el voto tiene prioridad sobre las historias guardadas
+                }
+            }
+        }
+
         const listaMusica = [
             "audio/11145955-mesa-10550.mp3",
             "audio/40173586-magic-forest-473582.mp3",
@@ -589,7 +712,11 @@
         function pedirHistoriaPonderada() {
             return supabaseClient
                 .rpc('obtener_historia_ponderada', { p_excluir: vistasRecientes })
-                .then(({ data, error }) => (error || !data) ? null : data);
+                .then(({ data, error }) => {
+                    if (error || !data) return null;
+                    cacheGuardarDesdeHistoria(data);
+                    return data;
+                });
         }
 
         async function mostrarHistoria(data) {
@@ -640,9 +767,8 @@
 
         // UNA sola petición: configuración + estadísticas + capítulo 1 de una historia concreta
         async function cargarConfiguracionHistoria(hId) {
-            const { data, error } = await supabaseClient
-                .rpc('obtener_historia', { p_historia: hId });
-            if (error || !data) return null;
+            const data = await obtenerHistoriaConCache(hId);
+            if (!data) return null;
             aplicarConfigHistoria(data);
             return data;
         }
@@ -659,19 +785,36 @@
         }
 
         async function registrarVotoEstrellas(calificacion) {
+            if (registrarVotoEstrellas.enCurso || votoLocal(historiaActualId)) return; // evita votos dobles
+            registrarVotoEstrellas.enCurso = true;
+            try {
+            const hVotada = historiaActualId;
             // El voto se suma de forma atómica en la base (función votar_estrellas)
             const { data, error } = await supabaseClient
-                .rpc('votar_estrellas', { p_historia: historiaActualId, p_estrellas: calificacion });
+                .rpc('votar_estrellas', { p_historia: hVotada, p_estrellas: calificacion });
             if (error || !data) {
                 console.error("Error al registrar voto:", error);
                 return;
             }
+            // Recordar el voto y los nuevos totales en el teléfono
+            guardarVotoLocal(hVotada, calificacion);
+            const eVoto = cacheLeerHistoria(hVotada);
+            if (eVoto && eVoto.cfg) {
+                eVoto.cfg.votos = data.votos;
+                eVoto.cfg.suma = data.suma;
+                cacheGuardarHistoria(hVotada, eVoto);
+            }
+            const hEnMemoria = historialHistorias.find(x => x.historia_id === hVotada);
+            if (hEnMemoria) { hEnMemoria.votos = data.votos; hEnMemoria.suma = data.suma; }
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             const contenedorVoto = document.getElementById('seccion-votacion-estrellas');
             if (contenedorVoto) {
                 contenedorVoto.innerHTML = `<div style="font-weight: bold; color: #28a745; padding: 10px;">¡Gracias por tu voto de ${calificacion} estrellas! ⭐</div>`;
             }
             pintarEstadisticas(data.votos, data.suma);
+            } finally {
+                registrarVotoEstrellas.enCurso = false;
+            }
         }
 
         async function iniciarApp() {
@@ -723,6 +866,7 @@
             if (historiaPrecargada) registrarEnHistorial(historiaPrecargada);
             await cargarCapitulo(capituloActualId, historiaPrecargada && historiaPrecargada.cap_1);
         }
+        cacheLimpiarVersionesAntiguas();
         setTimeout(iniciarApp, 500);
         async function cargarCapitulo(idCapitulo, capituloPrecargado) {
             document.getElementById('btn_next').style.display = 'none';
@@ -733,12 +877,14 @@
             actualizarBarritasProgreso();
 
             // Capítulo + opciones en UNA sola petición (o ya vienen incluidos con la historia)
-            let capData = capituloPrecargado;
+            const hId = historiaActualId;
+            let capData = capituloPrecargado || cacheLeerCapitulo(hId, idCapitulo); // primero la memoria local
             if (!capData) {
                 const { data, error } = await supabaseClient
-                    .rpc('obtener_capitulo', { p_historia: historiaActualId, p_capitulo: idCapitulo });
+                    .rpc('obtener_capitulo', { p_historia: hId, p_capitulo: idCapitulo });
                 if (error || !data) return false; // no se toca imagen ni texto
                 capData = data;
+                cacheGuardarCapitulo(hId, idCapitulo, data);
             }
             // La imagen cambia junto con el texto, cuando el capítulo ya está listo
             document.getElementById('imagen').src = 'https://picsum.photos/400/200?random=' + Math.random();
@@ -771,14 +917,22 @@
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
                 document.getElementById('hint-siguiente').style.display = 'none';
-                const bloqueFinal = document.createElement('div');
-                bloqueFinal.innerHTML = `
+                const votoPrevio = votoLocal(hId);
+                const bloqueVotacion = votoPrevio ? `
+                    <div class="rating-box" id="seccion-votacion-estrellas">
+                        <div style="font-weight: bold; font-size: 14px;">Tu calificación</div>
+                        <div class="stars-display" style="font-size: 28px; letter-spacing: 4px;">${'★'.repeat(votoPrevio)}${'☆'.repeat(5 - votoPrevio)}</div>
+                        <div style="font-size: 13px;">Votaste ${votoPrevio} ${votoPrevio === 1 ? 'estrella' : 'estrellas'}</div>
+                    </div>` : `
                     <div class="rating-box" id="seccion-votacion-estrellas">
                         <div style="font-weight: bold; font-size: 14px;">¿Qué te pareció la historia?</div>
                         <div class="interactive-stars" id="star-selector">
                             <span onclick="registrarVotoEstrellas(1)">★</span><span onclick="registrarVotoEstrellas(2)">★</span><span onclick="registrarVotoEstrellas(3)">★</span><span onclick="registrarVotoEstrellas(4)">★</span><span onclick="registrarVotoEstrellas(5)">★</span>
                         </div>
-                    </div>
+                    </div>`;
+                const bloqueFinal = document.createElement('div');
+                bloqueFinal.innerHTML = `
+                    ${bloqueVotacion}
                     <button class="btn btn-share" onclick="compartirReseña()">Compartir Reseña</button>
                     <div class="donation-box">
                         <div class="donation-text">
