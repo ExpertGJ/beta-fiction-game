@@ -333,6 +333,19 @@
             background-color: #17a2b8;
             margin-top: 10px;
         }
+        /* ---- Texto de apoyo al proyecto (vista de perfil) ---- */
+        .support-note {
+            font-size: 14px;
+            line-height: 1.35;
+            text-align: center;
+            color: var(--tg-theme-hint-color, #555555);
+            padding: 4px 10px 0;
+        }
+        .support-note a {
+            color: var(--tg-theme-link-color, #0b4fa8);
+            text-decoration: none;
+            cursor: pointer;
+        }
         /* ---- Botón de perfil y vista "Mis calificaciones" ---- */
         .music-row {
             display: grid;
@@ -531,6 +544,10 @@
                         <button id="search-next" class="nav-arrow" onclick="cambiarPaginaBusqueda(1)">&#10095;</button>
                     </div>
                 </div>
+            </div>
+            <!-- Texto de apoyo al proyecto -->
+            <div class="support-note">
+                Para mantener esta Mini App activa requerimos $25/mes en servidores. Apoya el proyecto enviando un regalo a nuestro canal <a href="https://t.me/BookBetaReader" onclick="abrirCanalRegalos(event)">@BookBetaReader</a>.
             </div>
         </div>
     </div>
@@ -1270,11 +1287,13 @@
                 window.open(urlTelegramShare, '_blank');
             }
         }
-        function abrirCanalRegalos() {
+        // Abre el canal dentro de Telegram (lo usan el botón "Ver Canal" y el enlace @BookBetaReader)
+        function abrirCanalRegalos(ev) {
+            if (ev && typeof ev.preventDefault === 'function') ev.preventDefault();
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             const urlCanal = 'https://t.me/BookBetaReader';
-            if (tg && typeof tg.openLink === 'function') {
-                tg.openLink(urlCanal);
+            if (tg && typeof tg.openTelegramLink === 'function') {
+                tg.openTelegramLink(urlCanal);
             } else {
                 window.open(urlCanal, '_blank');
             }
