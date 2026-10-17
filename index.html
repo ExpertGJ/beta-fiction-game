@@ -1041,14 +1041,34 @@
                 buscandoPagina = false;
             }
         }
-        function verificarParametroHistoria() {
+        // Pregunta antes de borrar todo (enlace ?startapp=limpiar). Devuelve true solo si el usuario pulsa "Eliminar".
+        function confirmarBorradoTotal() {
+            return new Promise(resolve => {
+                const mensaje = '¿Estás seguro de que deseas eliminar todo tu historial de lecturas y tus calificaciones guardadas? Esta acción no se puede deshacer.';
+                try {
+                    if (typeof tg.showPopup === 'function') {
+                        tg.showPopup({
+                            title: 'Eliminar historial',
+                            message: mensaje,
+                            buttons: [
+                                { id: 'eliminar', type: 'destructive', text: 'Eliminar' },
+                                { id: 'cancelar', type: 'default', text: 'Cancelar' }
+                            ]
+                        }, (idBoton) => resolve(idBoton === 'eliminar')); // cerrar el aviso sin elegir = cancelar
+                        return;
+                    }
+                } catch (e) {}
+                resolve(window.confirm(mensaje));
+            });
+        }
+        async function verificarParametroHistoria() {
             const params = new URLSearchParams(window.location.search);
             let historiaParam = params.get('historia') || params.get('startapp');
             if (!historiaParam && tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
                 historiaParam = tg.initDataUnsafe.start_param;
             }
-            if (historiaParam === 'limpiar') {   // palabra reservada: borra la memoria local y abre una historia al azar
-                borrarMemoriaLocal();
+            if (historiaParam === 'limpiar') {   // palabra reservada: pide confirmación, borra la memoria local y abre una historia al azar
+                if (await confirmarBorradoTotal()) borrarMemoriaLocal();
                 historiaParam = '';
             }
             if (historiaParam) {
@@ -1226,7 +1246,7 @@
                 `;
                 return;
             }
-            verificarParametroHistoria();
+            await verificarParametroHistoria();
             let historiaPrecargada = null;
             if (!historiaActualId) {
                 // Una sola petición: trae solo UNA historia que no se haya leído (selección ponderada 40/60)
