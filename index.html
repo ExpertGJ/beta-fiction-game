@@ -240,8 +240,11 @@
             cursor: not-allowed;
         }
         /* Opción elegida: sigue activa para poder desmarcarla tocándola otra vez */
-        .btn-seleccionada {
-            box-shadow: 0 0 0 3px #28a745;
+        .btn-seleccionada,
+        .btn-seleccionada:disabled {
+            background-color: #e0e0e0;
+            color: #555;
+            cursor: pointer;
         }
         .btn-next {
             background-color: #28a745;
@@ -550,7 +553,7 @@
             <!-- Contenedor dinámico de opciones -->
             <div id="opciones-container" class="options-container"></div>
             <!-- Texto de ayuda + icono de compartir la historia -->
-            <div class="hint-row">
+            <div class="hint-row" id="hint-row">
                 <div id="hint-siguiente" class="instruction-hint">¡Elige una opción y presiona siguiente!</div>
                 <button id="btn-compartir-icono" class="btn-compartir-icono" onclick="compartirReseña()" aria-label="Compartir esta historia">
                     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg>
@@ -1259,6 +1262,7 @@
         setTimeout(iniciarApp, 500);
         async function cargarCapitulo(idCapitulo, capituloPrecargado) {
             opcionSeleccionada = null; // capítulo nuevo: ninguna opción marcada
+            document.getElementById('hint-row').style.display = 'flex';
             document.getElementById('btn_next').style.display = 'none';
             document.getElementById('hint-siguiente').style.display = 'block';
             document.getElementById('btn-compartir-icono').style.display = 'flex';
@@ -1375,18 +1379,19 @@
         // Tocar la MISMA opción otra vez la desmarca y vuelven a quedar todas disponibles (sin cambiar su orden).
         function procesarSeleccionOpcion(opcionElegida, btnElegido) {
             const botones = document.querySelectorAll('#opciones-container .btn');
-            const hint = document.getElementById('hint-siguiente');
+            const filaHint = document.getElementById('hint-row'); // texto de ayuda + icono de compartir
             const btnNext = document.getElementById('btn_next');
 
             if (opcionSeleccionada === opcionElegida) {
                 opcionSeleccionada = null;
                 botones.forEach(b => {
+                    b.style.display = '';
                     b.disabled = false;
                     b.classList.remove('btn-seleccionada');
                 });
                 btnNext.style.display = 'none';
                 btnNext.onclick = null;
-                hint.style.display = 'block';
+                filaHint.style.display = 'flex';
                 if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
                 return;
             }
@@ -1394,10 +1399,10 @@
             opcionSeleccionada = opcionElegida;
             botones.forEach(b => {
                 const esLaElegida = (b === btnElegido);
-                b.disabled = !esLaElegida;               // las demás quedan bloqueadas; la elegida sigue activa para poder desmarcarla
-                b.classList.toggle('btn-seleccionada', esLaElegida);
+                b.style.display = esLaElegida ? '' : 'none'; // las demás desaparecen
+                b.classList.toggle('btn-seleccionada', esLaElegida); // la elegida queda gris y activa para poder desmarcarla
             });
-            hint.style.display = 'none';
+            filaHint.style.display = 'none';
             btnNext.style.display = 'block';
             btnNext.onclick = () => {
                 pasoActualIndex = obtenerIndicePorIdCapitulo(opcionElegida.siguiente_capitulo);
