@@ -189,12 +189,38 @@
             gap: 10px;
             width: 100%;
         }
+        /* ---- Fila inferior: texto de ayuda + icono de compartir ---- */
+        .hint-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 4px;
+        }
         .instruction-hint {
             font-style: italic;
             text-align: center;
             font-size: 14px;
-            margin-top: 4px;
             color: var(--tg-theme-hint-color, #707579);
+        }
+        .btn-compartir-icono {
+            background: none;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            color: var(--tg-theme-hint-color, #707579);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s;
+        }
+        .btn-compartir-icono:active {
+            opacity: 0.6;
+        }
+        .btn-compartir-icono svg {
+            width: 28px;
+            height: 28px;
+            display: block;
         }
         .btn {
             background-color: var(--tg-theme-button-color, #2481cc);
@@ -212,6 +238,10 @@
             background-color: #e0e0e0;
             color: #555;
             cursor: not-allowed;
+        }
+        /* Opción elegida: sigue activa para poder desmarcarla tocándola otra vez */
+        .btn-seleccionada {
+            box-shadow: 0 0 0 3px #28a745;
         }
         .btn-next {
             background-color: #28a745;
@@ -519,8 +549,13 @@
             <div id="pregunta" class="question">Por favor, espera...</div>
             <!-- Contenedor dinámico de opciones -->
             <div id="opciones-container" class="options-container"></div>
-            <!-- Texto agregado debajo de las opciones -->
-            <div id="hint-siguiente" class="instruction-hint">¡Elige una opción y presiona siguiente!</div>
+            <!-- Texto de ayuda + icono de compartir la historia -->
+            <div class="hint-row">
+                <div id="hint-siguiente" class="instruction-hint">¡Elige una opción y presiona siguiente!</div>
+                <button id="btn-compartir-icono" class="btn-compartir-icono" onclick="compartirReseña()" aria-label="Compartir esta historia">
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg>
+                </button>
+            </div>
             <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
         </div>
         <!-- Vista de perfil: libros calificados + buscador (se abre con el botón de perfil) -->
@@ -576,6 +611,7 @@
         let pasoActualIndex = 0;
         let autorActualNombre = '';
         let tituloActual = '';
+        let opcionSeleccionada = null; // opción marcada en el capítulo actual (null = ninguna)
 
         // Solo en memoria mientras la app está abierta (nada de esto se guarda en el teléfono):
         let historialIds = [];      // ids de las historias vistas, para las flechas atrás/adelante
@@ -1012,6 +1048,7 @@
                 historiaActualId = historiaParam;
             }
         }
+        // Mezcla Fisher-Yates: cada orden posible tiene la misma probabilidad
         function barajarArreglo(array) {
             let arr = [...array];
             for (let i = arr.length - 1; i > 0; i--) {
@@ -1221,8 +1258,10 @@
         limpiarMemoriaAntigua();
         setTimeout(iniciarApp, 500);
         async function cargarCapitulo(idCapitulo, capituloPrecargado) {
+            opcionSeleccionada = null; // capítulo nuevo: ninguna opción marcada
             document.getElementById('btn_next').style.display = 'none';
             document.getElementById('hint-siguiente').style.display = 'block';
+            document.getElementById('btn-compartir-icono').style.display = 'flex';
             document.getElementById('progress-bars-container').style.display = 'flex';
             pasoActualIndex = obtenerIndicePorIdCapitulo(idCapitulo);
             actualizarBarritasProgreso();
@@ -1267,6 +1306,8 @@
                 pasoActualIndex = totalPasosHistoria - 1;
                 actualizarBarritasProgreso();
                 document.getElementById('hint-siguiente').style.display = 'none';
+                // En el final ya está el botón grande "Compartir Reseña": se oculta el icono para no duplicar
+                document.getElementById('btn-compartir-icono').style.display = 'none';
                 const bloqueFinal = document.createElement('div');
                 bloqueFinal.innerHTML = `
                     ${htmlBloqueVotacion(hId)}
@@ -1282,12 +1323,13 @@
                 return;
             }
             if (opcionesValidas.length > 0) {
+                // Orden aleatorio distinto en cada capítulo y para cada lector
                 const opcionesAleatorias = barajarArreglo(opcionesValidas);
                 opcionesAleatorias.forEach((opcion) => {
                     const btn = document.createElement('button');
                     btn.className = 'btn';
                     btn.innerText = opcion.texto_opcion;
-                    btn.onclick = () => procesarSeleccionOpcion(opcion);
+                    btn.onclick = () => procesarSeleccionOpcion(opcion, btn);
                     contenedorOpciones.appendChild(btn);
                 });
             } else {
@@ -1305,6 +1347,7 @@
                 };
             }
         }
+        // Comparte el enlace directo a la historia: quien lo abra la verá desde el capítulo 1
         function compartirReseña() {
             if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             const tituloObra = document.getElementById('story-title-author').innerText;
@@ -1328,11 +1371,33 @@
                 window.open(urlCanal, '_blank');
             }
         }
-        function procesarSeleccionOpcion(opcionElegida) {
+        // Tocar una opción la marca y muestra "Siguiente Capítulo".
+        // Tocar la MISMA opción otra vez la desmarca y vuelven a quedar todas disponibles (sin cambiar su orden).
+        function procesarSeleccionOpcion(opcionElegida, btnElegido) {
             const botones = document.querySelectorAll('#opciones-container .btn');
-            botones.forEach(b => b.disabled = true);
-            document.getElementById('hint-siguiente').style.display = 'none';
+            const hint = document.getElementById('hint-siguiente');
             const btnNext = document.getElementById('btn_next');
+
+            if (opcionSeleccionada === opcionElegida) {
+                opcionSeleccionada = null;
+                botones.forEach(b => {
+                    b.disabled = false;
+                    b.classList.remove('btn-seleccionada');
+                });
+                btnNext.style.display = 'none';
+                btnNext.onclick = null;
+                hint.style.display = 'block';
+                if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
+                return;
+            }
+
+            opcionSeleccionada = opcionElegida;
+            botones.forEach(b => {
+                const esLaElegida = (b === btnElegido);
+                b.disabled = !esLaElegida;               // las demás quedan bloqueadas; la elegida sigue activa para poder desmarcarla
+                b.classList.toggle('btn-seleccionada', esLaElegida);
+            });
+            hint.style.display = 'none';
             btnNext.style.display = 'block';
             btnNext.onclick = () => {
                 pasoActualIndex = obtenerIndicePorIdCapitulo(opcionElegida.siguiente_capitulo);
