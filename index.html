@@ -55,21 +55,22 @@
         .nav-arrow:hover {
             opacity: 0.7;
         }
-        /* ---- Recuadro de música: flechas dentro, mismo color blanco que el texto ---- */
+        /* ---- Recuadro de música: discreto, para no distraer de la lectura ---- */
         .music-box {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             background-color: var(--tg-theme-button-color, #2481cc);
             color: var(--tg-theme-button-text-color, #ffffff);
             border-radius: 8px;
-            padding: 10px 14px;
+            padding: 7px 12px;
         }
         .music-nav-arrow {
             background: none;
             border: none;
             color: inherit;
-            padding: 0 2px;
+            opacity: 0.7;              /* blanco atenuado: las flechas acompañan, no compiten con el texto */
+            padding: 2px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -77,8 +78,14 @@
             user-select: none;
             transition: opacity 0.2s;
         }
-        .music-nav-arrow:hover {
-            opacity: 0.7;
+        .music-nav-arrow:hover,
+        .music-nav-arrow:active {
+            opacity: 1;
+        }
+        .music-nav-arrow svg {
+            width: 14px;
+            height: 14px;
+            display: block;
         }
         .music-toggle {
             background: none;
@@ -475,13 +482,13 @@
                 <audio id="bg-music" preload="none" loop></audio>
                 <div class="music-box">
                     <button class="music-nav-arrow" onclick="cambiarPistaManual(-1)" aria-label="Pista anterior">
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="12 6 6 12 12 18"/><polyline points="19 6 13 12 19 18"/></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="12 6 6 12 12 18"/><polyline points="19 6 13 12 19 18"/></svg>
                     </button>
                     <button class="music-toggle" onclick="toggleMusicaAleatoria()">
                         🎵 <span id="music-text">Música: Off</span>
                     </button>
                     <button class="music-nav-arrow" onclick="cambiarPistaManual(1)" aria-label="Pista siguiente">
-                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="12 6 18 12 12 18"/><polyline points="5 6 11 12 5 18"/></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="12 6 18 12 12 18"/><polyline points="5 6 11 12 5 18"/></svg>
                     </button>
                 </div>
             </div>
