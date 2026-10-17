@@ -198,28 +198,35 @@
             margin-top: 4px;
         }
         .instruction-hint {
+            position: relative;   /* el icono se ancla al texto, así el texto queda centrado en la pantalla */
             font-style: italic;
             text-align: center;
             font-size: 14px;
             color: var(--tg-theme-hint-color, #707579);
         }
         .btn-compartir-icono {
+            position: absolute;
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            margin-left: 2px;
             background: none;
             border: none;
             padding: 4px;
             cursor: pointer;
             color: var(--tg-theme-hint-color, #707579);
+            opacity: 0.5;         /* tenue para no distraer de la lectura */
             display: flex;
             align-items: center;
             justify-content: center;
             transition: opacity 0.2s;
         }
         .btn-compartir-icono:active {
-            opacity: 0.6;
+            opacity: 0.9;
         }
         .btn-compartir-icono svg {
-            width: 28px;
-            height: 28px;
+            width: 17px;
+            height: 17px;
             display: block;
         }
         .btn {
@@ -554,10 +561,7 @@
             <div id="opciones-container" class="options-container"></div>
             <!-- Texto de ayuda + icono de compartir la historia -->
             <div class="hint-row" id="hint-row">
-                <div id="hint-siguiente" class="instruction-hint">¡Elige una opción y presiona siguiente!</div>
-                <button id="btn-compartir-icono" class="btn-compartir-icono" onclick="compartirReseña()" aria-label="Compartir esta historia">
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg>
-                </button>
+                <div id="hint-siguiente" class="instruction-hint">¡Elige una opción y presiona siguiente!<button id="btn-compartir-icono" class="btn-compartir-icono" onclick="compartirReseña()" aria-label="Compartir esta historia"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg></button></div>
             </div>
             <button id="btn_next" class="btn btn-next">Siguiente Capítulo ➔</button>
         </div>
