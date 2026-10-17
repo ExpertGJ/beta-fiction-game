@@ -372,6 +372,16 @@
         .btn-share {
             background-color: #17a2b8;
             margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-share svg {
+            width: 20px;
+            height: 20px;
+            display: block;
+            flex-shrink: 0;
         }
         /* ---- Texto de apoyo al proyecto (vista de perfil) ---- */
         .support-note {
@@ -1339,7 +1349,7 @@
                 const bloqueFinal = document.createElement('div');
                 bloqueFinal.innerHTML = `
                     ${htmlBloqueVotacion(hId)}
-                    <button class="btn btn-share" onclick="compartirReseña()">Compartir Reseña</button>
+                    <button class="btn btn-share" onclick="compartirReseña()"><span>Compartir</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14 9V5l7 7-7 7v-4.1c-5 0-8.5 1.6-11 5.1 1-5 4-10 11-11z"/></svg></button>
                     <div class="donation-box">
                         <div class="donation-text">
                             Apóyanos ahora mismo enviando un regalo a nuestro canal.
