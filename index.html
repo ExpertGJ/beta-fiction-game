@@ -55,19 +55,40 @@
         .nav-arrow:hover {
             opacity: 0.7;
         }
+        /* ---- Recuadro de música: flechas dentro, mismo color blanco que el texto ---- */
+        .music-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: var(--tg-theme-button-color, #2481cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border-radius: 8px;
+            padding: 10px 14px;
+        }
         .music-nav-arrow {
             background: none;
             border: none;
-            font-size: 24px;
-            font-weight: bold;
-            color: var(--tg-theme-text-color, #000000);
+            color: inherit;
+            padding: 0 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            padding: 0 4px;
             user-select: none;
             transition: opacity 0.2s;
         }
         .music-nav-arrow:hover {
             opacity: 0.7;
+        }
+        .music-toggle {
+            background: none;
+            border: none;
+            color: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 0;
+            cursor: pointer;
+            white-space: nowrap;
         }
         .story-author-header {
             font-size: 18px;
@@ -359,6 +380,7 @@
         .rating-info {
             flex: 1;
             min-width: 0;
+            cursor: pointer;
         }
         .rating-title {
             font-weight: bold;
@@ -444,18 +466,24 @@
             </div>
             <button class="nav-arrow" onclick="cambiarHistoriaAdyacente(1)">&#10095;</button>
         </div>
-        <!-- Reproductor de Música Ambiental (con el botón de perfil a la izquierda) -->
+        <!-- Reproductor de Música (con el botón de perfil a la izquierda) -->
         <div class="music-row">
             <button id="btn-perfil" class="btn-perfil" onclick="alternarVistaPerfil()" aria-label="Mis calificaciones" aria-pressed="false">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8z"/></svg>
             </button>
             <div class="music-group">
                 <audio id="bg-music" preload="none" loop></audio>
-                <button class="music-nav-arrow" onclick="cambiarPistaManual(-1)">&#171;</button>
-                <button class="btn" style="padding: 10px 14px; font-size: 13px; width: auto; border-radius: 8px;" onclick="toggleMusicaAleatoria()">
-                🎵 <span id="music-text">Música Ambiental: Off</span>
-                </button>
-                <button class="music-nav-arrow" onclick="cambiarPistaManual(1)">&#187;</button>
+                <div class="music-box">
+                    <button class="music-nav-arrow" onclick="cambiarPistaManual(-1)" aria-label="Pista anterior">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="12 6 6 12 12 18"/><polyline points="19 6 13 12 19 18"/></svg>
+                    </button>
+                    <button class="music-toggle" onclick="toggleMusicaAleatoria()">
+                        🎵 <span id="music-text">Música: Off</span>
+                    </button>
+                    <button class="music-nav-arrow" onclick="cambiarPistaManual(1)" aria-label="Pista siguiente">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="12 6 18 12 12 18"/><polyline points="5 6 11 12 5 18"/></svg>
+                    </button>
+                </div>
             </div>
             <div></div>
         </div>
@@ -636,6 +664,8 @@
                 x.setAttribute('aria-label', 'Eliminar calificación');
                 x.textContent = '✕';
                 x.onclick = () => pedirConfirmacionEliminar(c);
+                // Al tocar el nombre de la obra o el autor, se abre esa historia
+                info.onclick = () => abrirHistoriaCalificada(c.id);
                 fila.appendChild(info);
                 fila.appendChild(est);
                 fila.appendChild(x);
@@ -678,6 +708,24 @@
         function alternarVistaPerfil() {
             if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
             if (perfilAbierto) cerrarVistaPerfil(); else abrirVistaPerfil();
+        }
+        // Abre una historia ya calificada desde la lista del perfil
+        async function abrirHistoriaCalificada(hId) {
+            if (abrirHistoriaCalificada.enCurso) return; // evita toques repetidos
+            abrirHistoriaCalificada.enCurso = true;
+            try {
+                if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+                limpiarBuscador();
+                const data = await cargarHistoriaPorId(hId);
+                if (!data) {
+                    if (tg.showAlert) { try { tg.showAlert('No se pudo abrir esta historia.'); } catch (e) {} }
+                    return;
+                }
+                registrarEnHistorial(data.historia_id);
+                await mostrarHistoria(data); // cierra el perfil y abre la historia desde el capítulo 1
+            } finally {
+                abrirHistoriaCalificada.enCurso = false;
+            }
         }
         function pedirConfirmacionEliminar(c) {
             calificacionPorEliminar = c.id;
@@ -782,7 +830,7 @@
             audio.loop = true;
             audio.load();
             audio.play().then(() => {
-                text.innerText = "Música Ambiental: On";
+                text.innerText = "Música: On";
                 if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
             }).catch(err => console.log("Error al cambiar pista manualmente:", err));
         }
@@ -795,11 +843,11 @@
                 } else {
                     audio.play().catch(err => console.log("Error al reproducir audio:", err));
                 }
-                text.innerText = "Música Ambiental: On";
+                text.innerText = "Música: On";
                 if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
             } else {
                 audio.pause();
-                text.innerText = "Música Ambiental: Off";
+                text.innerText = "Música: Off";
                 if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
             }
         }
