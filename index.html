@@ -580,14 +580,38 @@
         // Solo en memoria mientras la app está abierta (nada de esto se guarda en el teléfono):
         let historialIds = [];      // ids de las historias vistas, para las flechas atrás/adelante
         let indiceHistorial = -1;
-        let vistasRecientes = [];   // ids vistos, para no repetir historias seguidas
         const MAX_HISTORIAL = 30;
-        const MAX_VISTAS = 20;
 
         // ---------- MEMORIA LOCAL DEL TELÉFONO: SOLO LAS CALIFICACIONES DEL USUARIO ----------
         // Historias, capítulos, votos totales y promedio se piden a Supabase cada vez que se muestran.
         const CLAVE_VOTOS = 'br_votos';
         const MAX_VOTOS_GUARDADOS = 3000;
+
+        // ---------- HISTORIAS LEÍDAS: para que la flecha "siguiente" no repita recomendaciones ----------
+        // Se guarda el número (id) de las últimas MAX_LEIDAS historias mostradas, de la más antigua a la
+        // más reciente. Esa lista viaja a Supabase con cada petición de historia nueva (lo que SUBE no cuenta
+        // como egreso) y la base elige una que NO esté en la lista. Si el lector ya leyó todo el catálogo,
+        // la base devuelve la que lleva más tiempo sin leer, avisa con "ciclo_completo" y la app empieza un ciclo nuevo.
+        const CLAVE_LEIDAS = 'br_leidas';
+        const MAX_LEIDAS = 3000;
+        function cargarLeidas() {
+            try {
+                const a = JSON.parse(localStorage.getItem(CLAVE_LEIDAS) || '[]');
+                return Array.isArray(a) ? a.filter(Number.isInteger).slice(-MAX_LEIDAS) : [];
+            } catch (e) { return []; }
+        }
+        function guardarLeidas() {
+            try { localStorage.setItem(CLAVE_LEIDAS, JSON.stringify(leidas)); } catch (e) {}
+        }
+        // Anota una historia como leída (queda como la más reciente de la lista)
+        function marcarLeida(n) {
+            if (!Number.isInteger(n)) return;
+            leidas = leidas.filter(x => x !== n);
+            leidas.push(n);
+            if (leidas.length > MAX_LEIDAS) leidas = leidas.slice(leidas.length - MAX_LEIDAS);
+            guardarLeidas();
+        }
+        let leidas = cargarLeidas();
 
         // Calificaciones del usuario: historia -> { e: estrellas, t: título, a: autor }
         // (las guardadas por versiones anteriores eran solo el número de estrellas; también se leen)
@@ -745,7 +769,7 @@
                     if (tg.showAlert) { try { tg.showAlert('No se pudo abrir esta historia.'); } catch (e) {} }
                     return;
                 }
-                registrarEnHistorial(data.historia_id);
+                registrarEnHistorial(data.historia_id, data.n);
                 await mostrarHistoria(data); // cierra el perfil y abre la historia desde el capítulo 1
             } finally {
                 abrirHistoriaCalificada.enCurso = false;
@@ -804,19 +828,19 @@
                 }
                 claves.forEach(k => localStorage.removeItem(k));
             } catch (e) {}
-            vistasRecientes = [];
+            leidas = [];
             historialIds = [];
             indiceHistorial = -1;
             if (tg.showAlert) { try { tg.showAlert('Memoria local borrada.'); } catch (e) {} }
         }
         // Al arrancar: elimina lo que guardaron versiones anteriores (historias, capítulos, vistas)
-        // y conserva únicamente las calificaciones.
+        // y conserva únicamente las calificaciones y la lista de historias leídas.
         function limpiarMemoriaAntigua() {
             try {
                 const borrar = [];
                 for (let i = 0; i < localStorage.length; i++) {
                     const k = localStorage.key(i);
-                    if (k && k.startsWith('br') && k !== CLAVE_VOTOS) borrar.push(k);
+                    if (k && k.startsWith('br') && k !== CLAVE_VOTOS && k !== CLAVE_LEIDAS) borrar.push(k);
                 }
                 borrar.forEach(k => localStorage.removeItem(k));
             } catch (e) {}
@@ -954,7 +978,7 @@
                         if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
                         const historiaCargada = await cargarConfiguracionHistoria(historiaActualId);
                         if (historiaCargada) {
-                            registrarEnHistorial(historiaCargada.historia_id);
+                            registrarEnHistorial(historiaCargada.historia_id, historiaCargada.n);
                             cerrarVistaPerfil(); // vuelve a la lectura con la historia elegida
                         }
                         await cargarCapitulo(capituloActualId, historiaCargada && historiaCargada.cap_1);
@@ -1016,25 +1040,31 @@
         }
 
         // ---------- SELECCIÓN PONDERADA (40% recientes / 60% resto) ----------
-        // La elección se hace dentro de Supabase (función obtener_historia_ponderada):
-        // UNA sola petición por historia, nunca se descarga la lista.
+        // La elección se hace dentro de Supabase (función obtener_historia_no_leida):
+        // UNA sola petición por historia, nunca se descarga la lista de historias.
 
-        function registrarEnHistorial(id) {
+        // n = número de la historia (lo trae la respuesta de Supabase); se anota como leída
+        function registrarEnHistorial(id, n) {
             historialIds = historialIds.slice(0, indiceHistorial + 1);
             historialIds.push(id);
             if (historialIds.length > MAX_HISTORIAL) historialIds.shift();
             indiceHistorial = historialIds.length - 1;
 
-            // Recordar las últimas vistas (solo mientras la app está abierta) para no repetir
-            vistasRecientes = vistasRecientes.filter(x => x !== id);
-            vistasRecientes.push(id);
-            if (vistasRecientes.length > MAX_VISTAS) vistasRecientes.shift();
+            marcarLeida(n);
         }
 
+        // Pide una historia que el lector NO haya leído (40% recientes / 60% resto)
         function pedirHistoriaPonderada() {
             return supabaseClient
-                .rpc('obtener_historia_ponderada', { p_excluir: vistasRecientes })
-                .then(({ data, error }) => (error || !data) ? null : data);
+                .rpc('obtener_historia_no_leida', { p_leidas: leidas })
+                .then(({ data, error }) => {
+                    if (error || !data) return null;
+                    if (data.ciclo_completo) {   // ya leyó todo el catálogo: empieza un ciclo nuevo
+                        leidas = [];
+                        guardarLeidas();
+                    }
+                    return data;
+                });
         }
 
         // Historia concreta (ir atrás/adelante): se vuelve a cargar completa desde Supabase
@@ -1072,7 +1102,7 @@
                 if (!data) {
                     data = await pedirHistoriaPonderada();
                     if (!data) return; // no hay otra historia a la que ir
-                    registrarEnHistorial(data.historia_id);
+                    registrarEnHistorial(data.historia_id, data.n);
                 }
                 await mostrarHistoria(data);
             } finally {
@@ -1155,7 +1185,7 @@
             verificarParametroHistoria();
             let historiaPrecargada = null;
             if (!historiaActualId) {
-                // Una sola petición: trae solo UNA historia (selección ponderada 40/60)
+                // Una sola petición: trae solo UNA historia que no se haya leído (selección ponderada 40/60)
                 const data = await pedirHistoriaPonderada();
                 if (data) {
                     historiaActualId = data.historia_id;
@@ -1185,7 +1215,7 @@
                     }
                 }
             }
-            if (historiaPrecargada) registrarEnHistorial(historiaPrecargada.historia_id);
+            if (historiaPrecargada) registrarEnHistorial(historiaPrecargada.historia_id, historiaPrecargada.n);
             await cargarCapitulo(capituloActualId, historiaPrecargada && historiaPrecargada.cap_1);
         }
         limpiarMemoriaAntigua();
